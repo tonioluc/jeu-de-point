@@ -4,10 +4,12 @@ namespace jeu_de_point
 {
     public partial class Form1 : Form
     {
-        private const int GridLines = 9;
+        private const int GridLines = 10;
         private const int PaddingAroundGrid = 60;
 
-        private readonly HashSet<(int Col, int Row)> pointsVerts = new();
+        private readonly Dictionary<(int Col, int Row), Joueur> pointsPoses = new();
+        private Joueur[] joueurs = Array.Empty<Joueur>();
+        private int indexJoueurCourant;
 
         // Méthode isolée pour brancher les événements souris
         private void InitialiserEcouteSouris()
@@ -15,13 +17,40 @@ namespace jeu_de_point
             MouseClick += Form1_MouseClick;
         }
 
+        // Méthode isolée pour initialiser les joueurs et le tour
+        private void InitialiserJoueursEtTour()
+        {
+            joueurs =
+            [
+                new Joueur("Joueur 1", Color.Red),
+                new Joueur("Joueur 2", Color.Blue)
+            ];
+
+            indexJoueurCourant = 0;
+        }
+
+        private Joueur JoueurCourant => joueurs[indexJoueurCourant];
+
+        private void PasserAuJoueurSuivant()
+        {
+            indexJoueurCourant = (indexJoueurCourant + 1) % joueurs.Length;
+        }
+
         private void Form1_MouseClick(object? sender, MouseEventArgs e)
         {
-            if (TryGetNearestIntersection(e.Location, out var intersection))
+            if (!TryGetNearestIntersection(e.Location, out var intersection))
             {
-                pointsVerts.Add(intersection);
-                Invalidate();
+                return;
             }
+
+            if (pointsPoses.ContainsKey(intersection))
+            {
+                return;
+            }
+
+            pointsPoses[intersection] = JoueurCourant;
+            PasserAuJoueurSuivant();
+            Invalidate();
         }
 
         // Méthode isolée: transforme un clic en intersection la plus proche
@@ -76,6 +105,19 @@ namespace jeu_de_point
             return true;
         }
 
+        // Méthode isolée pour dessiner l'information du tour
+        private void DessinerTourCourant(Graphics g)
+        {
+            if (joueurs.Length == 0)
+            {
+                return;
+            }
+
+            string texte = $"Tour: {JoueurCourant.Nom}";
+            using var brush = new SolidBrush(JoueurCourant.Couleur);
+            g.DrawString(texte, Font, brush, 20, 20);
+        }
+
         // Méthode isolée pour dessiner la grille, appelable depuis d'autres endroits
         private void dessinerTerrain(Graphics g)
         {
@@ -98,12 +140,16 @@ namespace jeu_de_point
             }
 
             float rayonPoint = Math.Max(4f, step * 0.15f);
-            using var brush = new SolidBrush(Color.Green);
 
-            foreach (var (col, row) in pointsVerts)
+            foreach (var pointPose in pointsPoses)
             {
+                var (col, row) = pointPose.Key;
+                var joueur = pointPose.Value;
+
                 float x = startX + (col * step);
                 float y = startY + (row * step);
+
+                using var brush = new SolidBrush(joueur.Couleur);
                 g.FillEllipse(brush, x - rayonPoint, y - rayonPoint, rayonPoint * 2, rayonPoint * 2);
             }
         }
@@ -113,6 +159,8 @@ namespace jeu_de_point
             InitializeComponent();
             DoubleBuffered = true;
             ResizeRedraw = true;
+
+            InitialiserJoueursEtTour();
             InitialiserEcouteSouris();
         }
 
@@ -120,8 +168,8 @@ namespace jeu_de_point
         {
             base.OnPaint(e);
 
-            // tracer le terrain
             dessinerTerrain(e.Graphics);
+            DessinerTourCourant(e.Graphics);
         }
     }
 }
