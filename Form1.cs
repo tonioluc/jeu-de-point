@@ -11,6 +11,9 @@ namespace jeu_de_point
         private Joueur[] joueurs = Array.Empty<Joueur>();
         private int indexJoueurCourant;
 
+        // Conserver toutes les lignes tracées (ne plus effacer)
+        private readonly List<((int Col, int Row) Debut, (int Col, int Row) Fin, Color Couleur)> lignesAlignements = new();
+
         // Méthode isolée pour brancher les événements souris
         private void InitialiserEcouteSouris()
         {
@@ -36,6 +39,69 @@ namespace jeu_de_point
             indexJoueurCourant = (indexJoueurCourant + 1) % joueurs.Length;
         }
 
+        // Normaliser une ligne pour que Debut <= Fin (lexicographique) afin d'éviter les doublons inversés
+        private ((int Col, int Row) Debut, (int Col, int Row) Fin) NormaliserLigne((int Col, int Row) a, (int Col, int Row) b)
+        {
+            if (a.Col < b.Col) return (a, b);
+            if (a.Col > b.Col) return (b, a);
+            if (a.Row <= b.Row) return (a, b);
+            return (b, a);
+        }
+
+        // Méthode isolée: détecter 5 points alignés (horizontale, verticale, oblique)
+        private bool TryTrouverAlignementCinq((int Col, int Row) pointJoue, Joueur joueur, out ((int Col, int Row) Debut, (int Col, int Row) Fin) ligne)
+        {
+            ligne = default;
+
+            (int dCol, int dRow)[] directions =
+            [
+                (1, 0),
+                (0, 1),
+                (1, 1),
+                (1, -1)
+            ];
+
+            foreach (var (dCol, dRow) in directions)
+            {
+                var sequence = new List<(int Col, int Row)>();
+
+                int col = pointJoue.Col - dCol;
+                int row = pointJoue.Row - dRow;
+                while (pointsPoses.TryGetValue((col, row), out var jNeg) && ReferenceEquals(jNeg, joueur))
+                {
+                    sequence.Insert(0, (col, row));
+                    col -= dCol;
+                    row -= dRow;
+                }
+
+                int indexPointJoue = sequence.Count;
+                sequence.Add(pointJoue);
+
+                col = pointJoue.Col + dCol;
+                row = pointJoue.Row + dRow;
+                while (pointsPoses.TryGetValue((col, row), out var jPos) && ReferenceEquals(jPos, joueur))
+                {
+                    sequence.Add((col, row));
+                    col += dCol;
+                    row += dRow;
+                }
+
+                if (sequence.Count < 5)
+                {
+                    continue;
+                }
+
+                int startIndex = Math.Clamp(indexPointJoue - 2, 0, sequence.Count - 5);
+                var debut = sequence[startIndex];
+                var fin = sequence[startIndex + 4];
+
+                ligne = (debut, fin);
+                return true;
+            }
+
+            return false;
+        }
+
         private void Form1_MouseClick(object? sender, MouseEventArgs e)
         {
             if (!TryGetNearestIntersection(e.Location, out var intersection))
@@ -48,7 +114,21 @@ namespace jeu_de_point
                 return;
             }
 
-            pointsPoses[intersection] = JoueurCourant;
+            var joueurQuiJoue = JoueurCourant;
+            pointsPoses[intersection] = joueurQuiJoue;
+
+            if (TryTrouverAlignementCinq(intersection, joueurQuiJoue, out var ligne))
+            {
+                var normalisee = NormaliserLigne(ligne.Debut, ligne.Fin);
+
+                bool existe = lignesAlignements.Any(l => l.Debut == normalisee.Debut && l.Fin == normalisee.Fin && l.Couleur.ToArgb() == joueurQuiJoue.Couleur.ToArgb());
+                if (!existe)
+                {
+                    lignesAlignements.Add((normalisee.Debut, normalisee.Fin, joueurQuiJoue.Couleur));
+                }
+            }
+
+            // Ne pas effacer les anciennes lignes : on ne remet pas ligneAlignementCourante à null, on garde la collection
             PasserAuJoueurSuivant();
             Invalidate();
         }
@@ -118,6 +198,26 @@ namespace jeu_de_point
             g.DrawString(texte, Font, brush, 20, 20);
         }
 
+        // Méthode isolée pour dessiner toutes les lignes d'alignement déjà trouvées
+        private void DessinerLignesAlignement(Graphics g, int startX, int startY, float step)
+        {
+            if (lignesAlignements.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var (debut, fin, couleur) in lignesAlignements)
+            {
+                float x1 = startX + (debut.Col * step);
+                float y1 = startY + (debut.Row * step);
+                float x2 = startX + (fin.Col * step);
+                float y2 = startY + (fin.Row * step);
+
+                using var pen = new Pen(couleur, 4.5f);
+                g.DrawLine(pen, x1, y1, x2, y2);
+            }
+        }
+
         // Méthode isolée pour dessiner la grille, appelable depuis d'autres endroits
         private void dessinerTerrain(Graphics g)
         {
@@ -152,6 +252,9 @@ namespace jeu_de_point
                 using var brush = new SolidBrush(joueur.Couleur);
                 g.FillEllipse(brush, x - rayonPoint, y - rayonPoint, rayonPoint * 2, rayonPoint * 2);
             }
+
+            // Dessiner toutes les lignes déjà trouvées (persistantes)
+            DessinerLignesAlignement(g, startX, startY, step);
         }
 
         public Form1()
