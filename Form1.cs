@@ -20,7 +20,7 @@ namespace jeu_de_point
             MouseClick += Form1_MouseClick;
         }
 
-        // Méthode isolée pour initialiser les joueurs et le tour
+        // Méthode isolée pour initiaiser les joueurs et le tour
         private void InitialiserJoueursEtTour()
         {
             joueurs =
@@ -125,6 +125,7 @@ namespace jeu_de_point
                 if (!existe)
                 {
                     lignesAlignements.Add((normalisee.Debut, normalisee.Fin, joueurQuiJoue.Couleur));
+                    joueurQuiJoue.AjouterPoint();
                 }
             }
 
@@ -196,6 +197,54 @@ namespace jeu_de_point
             string texte = $"Tour: {JoueurCourant.Nom}";
             using var brush = new SolidBrush(JoueurCourant.Couleur);
             g.DrawString(texte, Font, brush, 20, 20);
+        }
+
+        // Méthode isolée pour dessiner le score des joueurs au-dessus de la grille
+        private void DessinerScores(Graphics g)
+        {
+            if (joueurs.Length == 0)
+            {
+                return;
+            }
+
+            if (!TryGetGridGeometry(out int startX, out int startY, out int gridSize, out _))
+            {
+                return;
+            }
+
+            using var scoreFont = new Font(Font.FontFamily, 16f, FontStyle.Bold);
+            float espace = 24f;
+
+            float largeurTotale = 0f;
+            foreach (var joueur in joueurs)
+            {
+                string nom = joueur.Nom;
+                string valeur = $": {joueur.Score}";
+                largeurTotale += g.MeasureString(nom, scoreFont).Width;
+                largeurTotale += g.MeasureString(valeur, scoreFont).Width;
+            }
+
+            if (joueurs.Length > 1)
+            {
+                largeurTotale += espace * (joueurs.Length - 1);
+            }
+
+            float x = startX + ((gridSize - largeurTotale) / 2f);
+            float y = Math.Max(8f, startY - scoreFont.Height - 12f);
+
+            using var brushValeur = new SolidBrush(ForeColor);
+            for (int i = 0; i < joueurs.Length; i++)
+            {
+                string nom = joueurs[i].Nom;
+                string valeur = $": {joueurs[i].Score}";
+
+                using var brushNom = new SolidBrush(joueurs[i].Couleur);
+                g.DrawString(nom, scoreFont, brushNom, x, y);
+                x += g.MeasureString(nom, scoreFont).Width;
+
+                g.DrawString(valeur, scoreFont, brushValeur, x, y);
+                x += g.MeasureString(valeur, scoreFont).Width + espace;
+            }
         }
 
         // Méthode isolée pour dessiner toutes les lignes d'alignement déjà trouvées
@@ -272,6 +321,7 @@ namespace jeu_de_point
             base.OnPaint(e);
 
             dessinerTerrain(e.Graphics);
+            DessinerScores(e.Graphics);
             DessinerTourCourant(e.Graphics);
         }
     }

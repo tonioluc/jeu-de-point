@@ -10,5 +10,11 @@ namespace jeu_de_point
 
         public string Nom { get; }
         public Color Couleur { get; }
+        public int Score { get; private set; }
+
+        public void AjouterPoint()
+        {
+            Score++;
+        }
     }
 }
