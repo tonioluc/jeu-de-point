@@ -4,12 +4,35 @@ namespace jeu_de_point
 {
     public partial class Form1 : Form
     {
-        private const int GridLines = 10;
+        private enum EtatEcran
+        {
+            MenuPrincipal,
+            ConfigurationNouvellePartie,
+            Partie
+        }
+
+        private int gridLines = 10;
         private const int PaddingAroundGrid = 60;
 
         private readonly Dictionary<(int Col, int Row), Joueur> pointsPoses = new();
         private Joueur[] joueurs = Array.Empty<Joueur>();
         private int indexJoueurCourant;
+
+        private EtatEcran etatEcran = EtatEcran.MenuPrincipal;
+
+        private Panel panelMenu = null!;
+        private Panel panelConfiguration = null!;
+        private Panel carteMenu = null!;
+        private Panel carteConfiguration = null!;
+        private FlowLayoutPanel panelActionsPartie = null!;
+
+        private Button boutonNouvellePartie = null!;
+        private Button boutonChargerPartie = null!;
+        private Button boutonRetourMenuConfiguration = null!;
+        private NumericUpDown inputGridLines = null!;
+        private Button boutonDemarrerPartie = null!;
+        private Button boutonMenuPrincipalPartie = null!;
+        private Button boutonNouvellePartiePartie = null!;
 
         // Conserver toutes les lignes tracées (ne plus effacer)
         private readonly List<((int Col, int Row) Debut, (int Col, int Row) Fin, Color Couleur)> lignesAlignements = new();
@@ -20,7 +43,288 @@ namespace jeu_de_point
             MouseClick += Form1_MouseClick;
         }
 
-        // Méthode isolée pour initiaiser les joueurs et le tour
+        private void ConfigurerStyleBouton(Button bouton, Color fond, Color texte)
+        {
+            bouton.FlatStyle = FlatStyle.Flat;
+            bouton.FlatAppearance.BorderSize = 0;
+            bouton.BackColor = fond;
+            bouton.ForeColor = texte;
+            bouton.Cursor = Cursors.Hand;
+            bouton.UseVisualStyleBackColor = false;
+        }
+
+        private void InitialiserEcranAccueil()
+        {
+            panelMenu = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(240, 246, 255)
+            };
+
+            panelConfiguration = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(245, 250, 255),
+                Visible = false
+            };
+
+            var titreMenu = new Label
+            {
+                AutoSize = true,
+                Text = "Jeu de point",
+                Font = new Font(Font.FontFamily, 22f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(32, 63, 110),
+                Margin = new Padding(0, 0, 0, 18),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            boutonNouvellePartie = new Button
+            {
+                Text = "Nouvelle partie",
+                Font = new Font(Font.FontFamily, 12f, FontStyle.Bold),
+                Margin = new Padding(0, 0, 0, 12)
+            };
+            ConfigurerStyleBouton(boutonNouvellePartie, Color.FromArgb(38, 112, 233), Color.White);
+            boutonNouvellePartie.Click += (_, _) => AfficherConfigurationNouvellePartie();
+
+            boutonChargerPartie = new Button
+            {
+                Text = "Charger une partie",
+                Font = new Font(Font.FontFamily, 12f, FontStyle.Bold),
+                Margin = new Padding(0)
+            };
+            ConfigurerStyleBouton(boutonChargerPartie, Color.FromArgb(92, 138, 214), Color.White);
+            boutonChargerPartie.Click += (_, _) => MessageBox.Show("Le scénario 'Charger une partie' sera ajouté ensuite.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            int largeurBoutonsMenu = Math.Max(
+                TextRenderer.MeasureText(boutonNouvellePartie.Text, boutonNouvellePartie.Font).Width,
+                TextRenderer.MeasureText(boutonChargerPartie.Text, boutonChargerPartie.Font).Width) + 90;
+
+            var tailleBoutonMenu = new Size(largeurBoutonsMenu, 54);
+            boutonNouvellePartie.Size = tailleBoutonMenu;
+            boutonChargerPartie.Size = tailleBoutonMenu;
+
+            carteMenu = new Panel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                BackColor = Color.White,
+                Padding = new Padding(34),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            var layoutMenu = new TableLayoutPanel
+            {
+                AutoSize = true,
+                ColumnCount = 1,
+                RowCount = 3,
+                BackColor = Color.Transparent
+            };
+            layoutMenu.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layoutMenu.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layoutMenu.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            layoutMenu.Controls.Add(titreMenu, 0, 0);
+            layoutMenu.Controls.Add(boutonNouvellePartie, 0, 1);
+            layoutMenu.Controls.Add(boutonChargerPartie, 0, 2);
+            carteMenu.Controls.Add(layoutMenu);
+            panelMenu.Controls.Add(carteMenu);
+
+            boutonRetourMenuConfiguration = new Button
+            {
+                Text = "Menu principal",
+                Font = new Font(Font.FontFamily, 10.5f, FontStyle.Bold),
+                Size = new Size(150, 38)
+            };
+            ConfigurerStyleBouton(boutonRetourMenuConfiguration, Color.FromArgb(88, 105, 128), Color.White);
+            boutonRetourMenuConfiguration.Click += (_, _) => AfficherMenuPrincipal();
+
+            var titreConfiguration = new Label
+            {
+                AutoSize = true,
+                Text = "Nouvelle partie",
+                Font = new Font(Font.FontFamily, 18f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(40, 74, 122),
+                Margin = new Padding(0, 0, 0, 18),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            var labelGridLines = new Label
+            {
+                AutoSize = true,
+                Text = "Nombre de lignes de la grille :",
+                Font = new Font(Font.FontFamily, 12f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(55, 71, 95),
+                Margin = new Padding(0, 0, 0, 10)
+            };
+
+            inputGridLines = new NumericUpDown
+            {
+                Minimum = 5,
+                Maximum = 30,
+                Value = 10,
+                Width = 170,
+                Font = new Font(Font.FontFamily, 12f, FontStyle.Regular),
+                Margin = new Padding(0, 0, 0, 16)
+            };
+
+            boutonDemarrerPartie = new Button
+            {
+                Text = "Valider",
+                Font = new Font(Font.FontFamily, 12f, FontStyle.Bold),
+                Size = new Size(170, 48),
+                Margin = new Padding(0)
+            };
+            ConfigurerStyleBouton(boutonDemarrerPartie, Color.FromArgb(39, 166, 117), Color.White);
+            boutonDemarrerPartie.Click += (_, _) => DemarrerNouvellePartie((int)inputGridLines.Value);
+
+            carteConfiguration = new Panel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                BackColor = Color.White,
+                Padding = new Padding(34),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            var layoutConfiguration = new TableLayoutPanel
+            {
+                AutoSize = true,
+                ColumnCount = 1,
+                RowCount = 4,
+                BackColor = Color.Transparent
+            };
+            layoutConfiguration.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layoutConfiguration.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layoutConfiguration.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layoutConfiguration.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            layoutConfiguration.Controls.Add(titreConfiguration, 0, 0);
+            layoutConfiguration.Controls.Add(labelGridLines, 0, 1);
+            layoutConfiguration.Controls.Add(inputGridLines, 0, 2);
+            layoutConfiguration.Controls.Add(boutonDemarrerPartie, 0, 3);
+            carteConfiguration.Controls.Add(layoutConfiguration);
+
+            panelConfiguration.Controls.Add(boutonRetourMenuConfiguration);
+            panelConfiguration.Controls.Add(carteConfiguration);
+
+            panelActionsPartie = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                BackColor = Color.Transparent,
+                Visible = false
+            };
+
+            boutonMenuPrincipalPartie = new Button
+            {
+                Text = "Menu principale",
+                Font = new Font(Font.FontFamily, 10f, FontStyle.Bold),
+                Size = new Size(170, 36),
+                Margin = new Padding(0, 0, 10, 0)
+            };
+            ConfigurerStyleBouton(boutonMenuPrincipalPartie, Color.FromArgb(88, 105, 128), Color.White);
+            boutonMenuPrincipalPartie.Click += (_, _) => AfficherMenuPrincipal();
+
+            boutonNouvellePartiePartie = new Button
+            {
+                Text = "Nouvelle partie",
+                Font = new Font(Font.FontFamily, 10f, FontStyle.Bold),
+                Size = new Size(170, 36),
+                Margin = new Padding(0)
+            };
+            ConfigurerStyleBouton(boutonNouvellePartiePartie, Color.FromArgb(38, 112, 233), Color.White);
+            boutonNouvellePartiePartie.Click += (_, _) => AfficherConfigurationNouvellePartie();
+
+            panelActionsPartie.Controls.Add(boutonMenuPrincipalPartie);
+            panelActionsPartie.Controls.Add(boutonNouvellePartiePartie);
+
+            Controls.Add(panelMenu);
+            Controls.Add(panelConfiguration);
+            Controls.Add(panelActionsPartie);
+
+            Resize += (_, _) =>
+            {
+                RecentrerLayout();
+                PositionnerBoutonsHautDroite();
+            };
+
+            RecentrerLayout();
+            PositionnerBoutonsHautDroite();
+        }
+
+        private void PositionnerBoutonsHautDroite()
+        {
+            if (panelConfiguration != null && boutonRetourMenuConfiguration != null)
+            {
+                boutonRetourMenuConfiguration.Left = panelConfiguration.ClientSize.Width - boutonRetourMenuConfiguration.Width - 18;
+                boutonRetourMenuConfiguration.Top = 18;
+            }
+
+            if (panelActionsPartie != null)
+            {
+                panelActionsPartie.Left = ClientSize.Width - panelActionsPartie.Width - 18;
+                panelActionsPartie.Top = 18;
+            }
+        }
+
+        private void RecentrerLayout()
+        {
+            if (carteMenu != null)
+            {
+                carteMenu.Left = (panelMenu.ClientSize.Width - carteMenu.Width) / 2;
+                carteMenu.Top = (panelMenu.ClientSize.Height - carteMenu.Height) / 2;
+            }
+
+            if (carteConfiguration != null)
+            {
+                carteConfiguration.Left = (panelConfiguration.ClientSize.Width - carteConfiguration.Width) / 2;
+                carteConfiguration.Top = (panelConfiguration.ClientSize.Height - carteConfiguration.Height) / 2;
+            }
+        }
+
+        private void AfficherMenuPrincipal()
+        {
+            etatEcran = EtatEcran.MenuPrincipal;
+            panelMenu.Visible = true;
+            panelConfiguration.Visible = false;
+            panelActionsPartie.Visible = false;
+            panelMenu.BringToFront();
+            RecentrerLayout();
+            Invalidate();
+        }
+
+        private void AfficherConfigurationNouvellePartie()
+        {
+            etatEcran = EtatEcran.ConfigurationNouvellePartie;
+            panelMenu.Visible = false;
+            panelConfiguration.Visible = true;
+            panelActionsPartie.Visible = false;
+            panelConfiguration.BringToFront();
+            RecentrerLayout();
+            PositionnerBoutonsHautDroite();
+            Invalidate();
+        }
+
+        private void DemarrerNouvellePartie(int valeurGridLines)
+        {
+            gridLines = Math.Max(2, valeurGridLines);
+            pointsPoses.Clear();
+            lignesAlignements.Clear();
+
+            InitialiserJoueursEtTour();
+
+            etatEcran = EtatEcran.Partie;
+            panelMenu.Visible = false;
+            panelConfiguration.Visible = false;
+            panelActionsPartie.Visible = true;
+            panelActionsPartie.BringToFront();
+            PositionnerBoutonsHautDroite();
+            Invalidate();
+        }
+
+        // Méthode isolée pour initialiser les joueurs et le tour
         private void InitialiserJoueursEtTour()
         {
             joueurs =
@@ -104,6 +408,11 @@ namespace jeu_de_point
 
         private void Form1_MouseClick(object? sender, MouseEventArgs e)
         {
+            if (etatEcran != EtatEcran.Partie)
+            {
+                return;
+            }
+
             if (!TryGetNearestIntersection(e.Location, out var intersection))
             {
                 return;
@@ -129,7 +438,6 @@ namespace jeu_de_point
                 }
             }
 
-            // Ne pas effacer les anciennes lignes : on ne remet pas ligneAlignementCourante à null, on garde la collection
             PasserAuJoueurSuivant();
             Invalidate();
         }
@@ -147,8 +455,8 @@ namespace jeu_de_point
             int nearestCol = (int)Math.Round((clickPoint.X - startX) / step);
             int nearestRow = (int)Math.Round((clickPoint.Y - startY) / step);
 
-            nearestCol = Math.Clamp(nearestCol, 0, GridLines - 1);
-            nearestRow = Math.Clamp(nearestRow, 0, GridLines - 1);
+            nearestCol = Math.Clamp(nearestCol, 0, gridLines - 1);
+            nearestRow = Math.Clamp(nearestRow, 0, gridLines - 1);
 
             float intersectionX = startX + (nearestCol * step);
             float intersectionY = startY + (nearestRow * step);
@@ -176,13 +484,13 @@ namespace jeu_de_point
             startX = (ClientSize.Width - gridSize) / 2;
             startY = (ClientSize.Height - gridSize) / 2;
 
-            if (GridLines < 2)
+            if (gridLines < 2)
             {
                 step = 0;
                 return false;
             }
 
-            step = gridSize / (float)(GridLines - 1);
+            step = gridSize / (float)(gridLines - 1);
             return true;
         }
 
@@ -279,7 +587,7 @@ namespace jeu_de_point
 
             using var pen = new Pen(Color.LightGray, 2.4f) { DashStyle = DashStyle.Solid };
 
-            for (int i = 0; i < GridLines; i++)
+            for (int i = 0; i < gridLines; i++)
             {
                 float y = startY + (i * step);
                 g.DrawLine(pen, startX, y, startX + gridSize, y);
@@ -314,11 +622,18 @@ namespace jeu_de_point
 
             InitialiserJoueursEtTour();
             InitialiserEcouteSouris();
+            InitialiserEcranAccueil();
+            AfficherMenuPrincipal();
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
+
+            if (etatEcran != EtatEcran.Partie)
+            {
+                return;
+            }
 
             dessinerTerrain(e.Graphics);
             DessinerScores(e.Graphics);
