@@ -55,11 +55,16 @@ namespace jeu_de_point
 
         public Rectangle ObtenirRectangle(int startX, int startY, int gridSize)
         {
-            int x = EstGauche
-                ? startX - Espacement - Largeur
-                : startX + gridSize + Espacement;
+            return ObtenirRectangle(startX, startY, gridSize, Largeur, Espacement);
+        }
 
-            return new Rectangle(x, startY, Largeur, gridSize);
+        public Rectangle ObtenirRectangle(int startX, int startY, int gridSize, int largeur, int espacement)
+        {
+            int x = EstGauche
+                ? startX - espacement - largeur
+                : startX + gridSize + espacement;
+
+            return new Rectangle(x, startY, largeur, gridSize);
         }
 
         public static int ExtrairePuissanceDepuisTouche(Keys keyCode)

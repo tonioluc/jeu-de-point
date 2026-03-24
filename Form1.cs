@@ -2,7 +2,7 @@ namespace jeu_de_point
 {
     public partial class Form1 : Form
     {
-        private const int PaddingAroundGrid = 60;
+        private ITheme Theme => ThemeManager.Theme;
 
         private GrilleJeu grille = null!;
         private Joueur[] joueurs = [];
@@ -197,7 +197,7 @@ namespace jeu_de_point
         {
             if (etatEcran != EtatEcran.Partie) return;
 
-            if (!grille.TryGetGeometrie(ClientSize, PaddingAroundGrid, out var geo)) return;
+            if (!grille.TryGetGeometrie(ClientSize, Theme.PaddingAutourGrille, out var geo)) return;
             if (!grille.TryGetIntersectionProche(e.Location, geo, out var intersection)) return;
             if (!grille.PeutPoserPoint(intersection.Col, intersection.Row)) return;
 
@@ -309,7 +309,7 @@ namespace jeu_de_point
             base.OnPaint(e);
 
             if (etatEcran != EtatEcran.Partie) return;
-            if (!grille.TryGetGeometrie(ClientSize, PaddingAroundGrid, out var geo)) return;
+            if (!grille.TryGetGeometrie(ClientSize, Theme.PaddingAutourGrille, out var geo)) return;
 
             dessinateur.DessinerTerrain(e.Graphics, grille, geo);
             dessinateur.DessinerCanons(e.Graphics, canons, geo);

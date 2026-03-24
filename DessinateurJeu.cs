@@ -4,15 +4,12 @@ namespace jeu_de_point
 {
     public class DessinateurJeu
     {
-        private readonly Font fontInfo;
-        private readonly Font fontScore;
-        private readonly Font fontCanon;
+        private readonly Font baseFont;
+        private ITheme Theme => ThemeManager.Theme;
 
         public DessinateurJeu(Font baseFont)
         {
-            fontInfo = new Font(baseFont.FontFamily, 10.5f, FontStyle.Bold);
-            fontScore = new Font(baseFont.FontFamily, 16f, FontStyle.Bold);
-            fontCanon = new Font(baseFont.FontFamily, 9f, FontStyle.Bold);
+            this.baseFont = baseFont;
         }
 
         public void DessinerTerrain(Graphics g, GrilleJeu grille, GeometrieGrille geo)
@@ -71,24 +68,26 @@ namespace jeu_de_point
 
         public void DessinerCanons(Graphics g, Canon[] canons, GeometrieGrille geo)
         {
+            using var fontCanon = new Font(baseFont.FontFamily, Theme.CanonTaillePoliceY, FontStyle.Bold);
+
             foreach (var canon in canons)
             {
-                var rect = canon.ObtenirRectangle(geo.StartX, geo.StartY, geo.GridSize);
-                DessinerCanon(g, rect, canon.Couleur, canon.PositionY, geo.Step, canon.EstGauche);
+                var rect = canon.ObtenirRectangle(geo.StartX, geo.StartY, geo.GridSize, Theme.CanonLargeur, Theme.CanonEspacement);
+                DessinerCanon(g, rect, canon.Couleur, canon.PositionY, geo.Step, canon.EstGauche, fontCanon);
             }
         }
 
-        private void DessinerCanon(Graphics g, Rectangle rectCanon, Color couleur, int yGrille, float step, bool estGauche)
+        private void DessinerCanon(Graphics g, Rectangle rectCanon, Color couleur, int yGrille, float step, bool estGauche, Font fontCanon)
         {
-            using var brushCanon = new SolidBrush(Color.FromArgb(70, couleur));
-            using var penCanon = new Pen(couleur, 2f);
+            using var brushCanon = new SolidBrush(Color.FromArgb(Theme.CanonOpaciteFond, couleur));
+            using var penCanon = new Pen(couleur, Theme.CanonEpaisseurBordure);
             g.FillRectangle(brushCanon, rectCanon);
             g.DrawRectangle(penCanon, rectCanon);
 
             float y = rectCanon.Top + (yGrille * step);
             y = Math.Clamp(y, rectCanon.Top, rectCanon.Bottom);
 
-            using var penIndicateur = new Pen(couleur, 3f);
+            using var penIndicateur = new Pen(couleur, Theme.CanonEpaisseurIndicateur);
             g.DrawLine(penIndicateur, rectCanon.Left, y, rectCanon.Right, y);
 
             float xPoint = estGauche ? rectCanon.Left - 8 : rectCanon.Right + 8;
@@ -114,8 +113,8 @@ namespace jeu_de_point
 
             float y = geo.StartY + (animation.CibleRow * geo.Step);
             float xOrigine = canon.EstGauche
-                ? geo.StartX - Canon.Espacement
-                : geo.StartX + geo.GridSize + Canon.Espacement;
+                ? geo.StartX - Theme.CanonEspacement
+                : geo.StartX + geo.GridSize + Theme.CanonEspacement;
             float xCible = geo.StartX + (animation.CibleCol * geo.Step);
             float xProjectile = xOrigine + ((xCible - xOrigine) * animation.Progression);
 
@@ -134,7 +133,8 @@ namespace jeu_de_point
                 return;
             }
 
-            float espace = 24f;
+            using var fontScore = new Font(baseFont.FontFamily, Theme.ScoreTaillePolice, FontStyle.Bold);
+            float espace = Theme.ScoreEspacementJoueurs;
             float largeurTotale = 0f;
 
             foreach (var joueur in joueurs)
@@ -170,6 +170,8 @@ namespace jeu_de_point
 
         public void DessinerHUD(Graphics g, Joueur joueurCourant)
         {
+            using var fontInfo = new Font(baseFont.FontFamily, Theme.HudTaillePolice, FontStyle.Bold);
+
             string[] informations =
             [
                 $"Tour: {joueurCourant.Nom}",
@@ -177,42 +179,39 @@ namespace jeu_de_point
                 "CTRL + 1..9: Tir (puissance)"
             ];
 
-            Color[] fonds =
-            [
-                Color.FromArgb(226, 240, 255),
-                Color.FromArgb(234, 246, 236),
-                Color.FromArgb(255, 241, 222)
-            ];
+            var fonds = Theme.HudCouleursFond;
+            var bordures = Theme.HudCouleursBordure;
 
-            Color[] bordures =
-            [
-                Color.FromArgb(49, 112, 194),
-                Color.FromArgb(62, 145, 95),
-                Color.FromArgb(198, 128, 34)
-            ];
-
-            float x = 12f;
-            float y = 12f;
-            float largeurMax = informations.Max(texte => g.MeasureString(texte, fontInfo).Width) + 24f;
-            float hauteurBloc = g.MeasureString("Ag", fontInfo).Height + 12f;
+            float x = Theme.HudMargeGauche;
+            float y = Theme.HudMargeHaut;
+            float largeurMax = informations.Max(texte => g.MeasureString(texte, fontInfo).Width) + (Theme.HudPaddingHorizontal * 2);
+            float hauteurBloc = g.MeasureString("Ag", fontInfo).Height + (Theme.HudPaddingVertical * 2);
 
             for (int i = 0; i < informations.Length; i++)
             {
                 var rect = new RectangleF(x, y, largeurMax, hauteurBloc);
-                DessinerBlocInfo(g, rect, informations[i], fonds[i], bordures[i]);
-                y += hauteurBloc + 8f;
+                var fond = i < fonds.Length ? fonds[i] : fonds[0];
+                var bordure = i < bordures.Length ? bordures[i] : bordures[0];
+                DessinerBlocInfo(g, rect, informations[i], fond, bordure, fontInfo);
+                y += hauteurBloc + Theme.HudEspacementBlocs;
             }
         }
 
-        private void DessinerBlocInfo(Graphics g, RectangleF rect, string texte, Color fond, Color bordure)
+        private void DessinerBlocInfo(Graphics g, RectangleF rect, string texte, Color fond, Color bordure, Font font)
         {
             using var brushFond = new SolidBrush(fond);
-            using var penBordure = new Pen(bordure, 1.6f);
-            using var brushTexte = new SolidBrush(Color.FromArgb(30, 30, 30));
+            using var brushTexte = new SolidBrush(Color.FromArgb(240, 240, 240));
 
             g.FillRectangle(brushFond, rect);
-            g.DrawRectangle(penBordure, rect.X, rect.Y, rect.Width, rect.Height);
-            g.DrawString(texte, fontInfo, brushTexte, rect.X + 10f, rect.Y + 6f);
+
+            if (Theme.HudEpaisseurBordure > 0)
+            {
+                using var penBordure = new Pen(bordure, Theme.HudEpaisseurBordure);
+                g.DrawRectangle(penBordure, rect.X, rect.Y, rect.Width, rect.Height);
+                brushTexte.Color = Color.FromArgb(30, 30, 30);
+            }
+
+            g.DrawString(texte, font, brushTexte, rect.X + Theme.HudPaddingHorizontal, rect.Y + Theme.HudPaddingVertical);
         }
     }
 }

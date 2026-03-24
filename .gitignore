@@ -14,3 +14,8 @@ Release/
 
 Thumbs.db
 .DS_Store
+
+# Fichiers de personnalisation locale (non partages)
+# Ces fichiers permettent de personnaliser l'interface sans affecter les autres developpeurs
+ThemeLocal.cs
+*Local.cs
