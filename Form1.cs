@@ -13,10 +13,13 @@ namespace jeu_de_point
 
         private int gridLines = 10;
         private const int PaddingAroundGrid = 60;
+        private const int CanonWidth = 20;
+        private const int CanonGap = 20;
 
         private readonly Dictionary<(int Col, int Row), Joueur> pointsPoses = new();
         private Joueur[] joueurs = Array.Empty<Joueur>();
         private int indexJoueurCourant;
+        private int[] positionsCanonY = Array.Empty<int>();
 
         private EtatEcran etatEcran = EtatEcran.MenuPrincipal;
 
@@ -41,6 +44,13 @@ namespace jeu_de_point
         private void InitialiserEcouteSouris()
         {
             MouseClick += Form1_MouseClick;
+        }
+
+        // Méthode isolée pour brancher les événements clavier
+        private void InitialiserEcouteClavier()
+        {
+            KeyPreview = true;
+            KeyDown += Form1_KeyDown;
         }
 
         private void ConfigurerStyleBouton(Button bouton, Color fond, Color texte)
@@ -314,6 +324,7 @@ namespace jeu_de_point
             lignesAlignements.Clear();
 
             InitialiserJoueursEtTour();
+            positionsCanonY = Enumerable.Repeat(0, joueurs.Length).ToArray();
 
             etatEcran = EtatEcran.Partie;
             panelMenu.Visible = false;
@@ -440,6 +451,38 @@ namespace jeu_de_point
 
             PasserAuJoueurSuivant();
             Invalidate();
+        }
+
+        private void Form1_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (etatEcran != EtatEcran.Partie || joueurs.Length == 0 || positionsCanonY.Length != joueurs.Length)
+            {
+                return;
+            }
+
+            int index = indexJoueurCourant;
+            int anciennePosition = positionsCanonY[index];
+
+            if (e.KeyCode == Keys.Up)
+            {
+                positionsCanonY[index] = Math.Max(0, positionsCanonY[index] - 1);
+            }
+            else if (e.KeyCode == Keys.Down)
+            {
+                positionsCanonY[index] = Math.Min(gridLines - 1, positionsCanonY[index] + 1);
+            }
+            else
+            {
+                return;
+            }
+
+            if (positionsCanonY[index] != anciennePosition)
+            {
+                Invalidate();
+            }
+
+            e.Handled = true;
+            e.SuppressKeyPress = true;
         }
 
         // Méthode isolée: transforme un clic en intersection la plus proche
@@ -575,6 +618,46 @@ namespace jeu_de_point
             }
         }
 
+        private void DessinerCanonEtIndicateur(Graphics g, Rectangle rectCanon, Color couleurJoueur, int yGrille, float step, bool estGauche)
+        {
+            using var brushCanon = new SolidBrush(Color.FromArgb(70, couleurJoueur));
+            using var penCanon = new Pen(couleurJoueur, 2f);
+            g.FillRectangle(brushCanon, rectCanon);
+            g.DrawRectangle(penCanon, rectCanon);
+
+            float y = rectCanon.Top + (yGrille * step);
+            y = Math.Clamp(y, rectCanon.Top, rectCanon.Bottom);
+
+            using var penIndicateur = new Pen(couleurJoueur, 3f);
+            g.DrawLine(penIndicateur, rectCanon.Left, y, rectCanon.Right, y);
+
+            float xPoint = estGauche ? rectCanon.Left - 8 : rectCanon.Right + 8;
+            using var brushPoint = new SolidBrush(couleurJoueur);
+            g.FillEllipse(brushPoint, xPoint - 5, y - 5, 10, 10);
+
+            string texte = $"Y: {yGrille}";
+            using var fontTexte = new Font(Font.FontFamily, 9f, FontStyle.Bold);
+            SizeF tailleTexte = g.MeasureString(texte, fontTexte);
+            float xTexte = estGauche ? rectCanon.Left - tailleTexte.Width - 14 : rectCanon.Right + 14;
+            float yTexte = y - (tailleTexte.Height / 2f);
+            g.DrawString(texte, fontTexte, brushPoint, xTexte, yTexte);
+        }
+
+        // Méthode isolée pour dessiner les canons et leurs indicateurs Y
+        private void DessinerCanons(Graphics g, int startX, int startY, int gridSize, float step)
+        {
+            if (joueurs.Length < 2 || positionsCanonY.Length != joueurs.Length)
+            {
+                return;
+            }
+
+            var rectCanonGauche = new Rectangle(startX - CanonGap - CanonWidth, startY, CanonWidth, gridSize);
+            var rectCanonDroit = new Rectangle(startX + gridSize + CanonGap, startY, CanonWidth, gridSize);
+
+            DessinerCanonEtIndicateur(g, rectCanonGauche, joueurs[0].Couleur, positionsCanonY[0], step, estGauche: true);
+            DessinerCanonEtIndicateur(g, rectCanonDroit, joueurs[1].Couleur, positionsCanonY[1], step, estGauche: false);
+        }
+
         // Méthode isolée pour dessiner la grille, appelable depuis d'autres endroits
         private void dessinerTerrain(Graphics g)
         {
@@ -612,6 +695,9 @@ namespace jeu_de_point
 
             // Dessiner toutes les lignes déjà trouvées (persistantes)
             DessinerLignesAlignement(g, startX, startY, step);
+
+            // Dessiner les canons des joueurs et l'indicateur de coordonnée Y
+            DessinerCanons(g, startX, startY, gridSize, step);
         }
 
         public Form1()
@@ -621,7 +707,9 @@ namespace jeu_de_point
             ResizeRedraw = true;
 
             InitialiserJoueursEtTour();
+            positionsCanonY = Enumerable.Repeat(0, joueurs.Length).ToArray();
             InitialiserEcouteSouris();
+            InitialiserEcouteClavier();
             InitialiserEcranAccueil();
             AfficherMenuPrincipal();
         }
