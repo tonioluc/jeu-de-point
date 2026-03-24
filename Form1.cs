@@ -8,6 +8,7 @@ namespace jeu_de_point
         {
             MenuPrincipal,
             ConfigurationNouvellePartie,
+            ChargementPartie,
             Partie
         }
 
@@ -23,6 +24,11 @@ namespace jeu_de_point
         private int indexJoueurCourant;
         private int[] positionsCanonY = Array.Empty<int>();
 
+        private readonly Connexion connexion = new();
+        private int? partieCouranteId;
+        private int ordreAction;
+        private bool erreurSauvegardeAffichee;
+
         private readonly System.Windows.Forms.Timer timerAnimationTir = new() { Interval = 25 };
         private bool animationTirActive;
         private DateTime animationTirDebut;
@@ -34,28 +40,34 @@ namespace jeu_de_point
 
         private Panel panelMenu = null!;
         private Panel panelConfiguration = null!;
+        private Panel panelChargement = null!;
         private Panel carteMenu = null!;
         private Panel carteConfiguration = null!;
+        private Panel carteChargement = null!;
         private FlowLayoutPanel panelActionsPartie = null!;
 
         private Button boutonNouvellePartie = null!;
         private Button boutonChargerPartie = null!;
         private Button boutonRetourMenuConfiguration = null!;
+        private Button boutonRetourMenuChargement = null!;
         private NumericUpDown inputGridLines = null!;
         private Button boutonDemarrerPartie = null!;
         private Button boutonMenuPrincipalPartie = null!;
         private Button boutonNouvellePartiePartie = null!;
+        private ListBox listeParties = null!;
+        private Button boutonOuvrirPartie = null!;
+        private Button boutonSupprimerPartie = null!;
 
-        // Conserver toutes les lignes tracées (ne plus effacer)
+        // Conserver toutes les lignes tracï¿½es (ne plus effacer)
         private readonly List<((int Col, int Row) Debut, (int Col, int Row) Fin, Color Couleur)> lignesAlignements = new();
 
-        // Méthode isolée pour brancher les événements souris
+        // Mï¿½thode isolï¿½e pour brancher les ï¿½vï¿½nements souris
         private void InitialiserEcouteSouris()
         {
             MouseClick += Form1_MouseClick;
         }
 
-        // Méthode isolée pour brancher les événements clavier
+        // Mï¿½thode isolï¿½e pour brancher les ï¿½vï¿½nements clavier
         private void InitialiserEcouteClavier()
         {
             KeyPreview = true;
@@ -107,6 +119,13 @@ namespace jeu_de_point
                 Visible = false
             };
 
+            panelChargement = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(245, 250, 255),
+                Visible = false
+            };
+
             var titreMenu = new Label
             {
                 AutoSize = true,
@@ -133,7 +152,7 @@ namespace jeu_de_point
                 Margin = new Padding(0)
             };
             ConfigurerStyleBouton(boutonChargerPartie, Color.FromArgb(92, 138, 214), Color.White);
-            boutonChargerPartie.Click += (_, _) => MessageBox.Show("Le scénario 'Charger une partie' sera ajouté ensuite.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            boutonChargerPartie.Click += (_, _) => AfficherChargementPartie();
 
             int largeurBoutonsMenu = Math.Max(
                 TextRenderer.MeasureText(boutonNouvellePartie.Text, boutonNouvellePartie.Font).Width,
@@ -247,6 +266,83 @@ namespace jeu_de_point
             panelConfiguration.Controls.Add(boutonRetourMenuConfiguration);
             panelConfiguration.Controls.Add(carteConfiguration);
 
+            boutonRetourMenuChargement = new Button
+            {
+                Text = "Menu principal",
+                Font = new Font(Font.FontFamily, 10.5f, FontStyle.Bold),
+                Size = new Size(150, 38)
+            };
+            ConfigurerStyleBouton(boutonRetourMenuChargement, Color.FromArgb(88, 105, 128), Color.White);
+            boutonRetourMenuChargement.Click += (_, _) => AfficherMenuPrincipal();
+
+            var titreChargement = new Label
+            {
+                AutoSize = true,
+                Text = "Charger une partie",
+                Font = new Font(Font.FontFamily, 18f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(40, 74, 122),
+                Margin = new Padding(0, 0, 0, 14)
+            };
+
+            listeParties = new ListBox
+            {
+                Width = 560,
+                Height = 260,
+                Font = new Font(Font.FontFamily, 10f, FontStyle.Regular),
+                Margin = new Padding(0, 0, 0, 12)
+            };
+            listeParties.DoubleClick += (_, _) => ChargerPartieSelectionnee();
+
+            boutonOuvrirPartie = new Button
+            {
+                Text = "Ouvrir la partie sï¿½lectionnï¿½e",
+                Font = new Font(Font.FontFamily, 11f, FontStyle.Bold),
+                Size = new Size(280, 44),
+                Margin = new Padding(0, 0, 0, 8)
+            };
+            ConfigurerStyleBouton(boutonOuvrirPartie, Color.FromArgb(39, 166, 117), Color.White);
+            boutonOuvrirPartie.Click += (_, _) => ChargerPartieSelectionnee();
+
+            boutonSupprimerPartie = new Button
+            {
+                Text = "Supprimer la partie",
+                Font = new Font(Font.FontFamily, 10f, FontStyle.Bold),
+                Size = new Size(200, 38),
+                Margin = new Padding(0)
+            };
+            ConfigurerStyleBouton(boutonSupprimerPartie, Color.FromArgb(200, 60, 60), Color.White);
+            boutonSupprimerPartie.Click += (_, _) => SupprimerPartieSelectionnee();
+
+            carteChargement = new Panel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                BackColor = Color.White,
+                Padding = new Padding(30),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            var layoutChargement = new TableLayoutPanel
+            {
+                AutoSize = true,
+                ColumnCount = 1,
+                RowCount = 4,
+                BackColor = Color.Transparent
+            };
+            layoutChargement.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layoutChargement.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layoutChargement.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layoutChargement.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            layoutChargement.Controls.Add(titreChargement, 0, 0);
+            layoutChargement.Controls.Add(listeParties, 0, 1);
+            layoutChargement.Controls.Add(boutonOuvrirPartie, 0, 2);
+            layoutChargement.Controls.Add(boutonSupprimerPartie, 0, 3);
+            carteChargement.Controls.Add(layoutChargement);
+
+            panelChargement.Controls.Add(boutonRetourMenuChargement);
+            panelChargement.Controls.Add(carteChargement);
+
             panelActionsPartie = new FlowLayoutPanel
             {
                 AutoSize = true,
@@ -281,6 +377,7 @@ namespace jeu_de_point
 
             Controls.Add(panelMenu);
             Controls.Add(panelConfiguration);
+            Controls.Add(panelChargement);
             Controls.Add(panelActionsPartie);
 
             Resize += (_, _) =>
@@ -299,6 +396,12 @@ namespace jeu_de_point
             {
                 boutonRetourMenuConfiguration.Left = panelConfiguration.ClientSize.Width - boutonRetourMenuConfiguration.Width - 18;
                 boutonRetourMenuConfiguration.Top = 18;
+            }
+
+            if (panelChargement != null && boutonRetourMenuChargement != null)
+            {
+                boutonRetourMenuChargement.Left = panelChargement.ClientSize.Width - boutonRetourMenuChargement.Width - 18;
+                boutonRetourMenuChargement.Top = 18;
             }
 
             if (panelActionsPartie != null)
@@ -321,6 +424,12 @@ namespace jeu_de_point
                 carteConfiguration.Left = (panelConfiguration.ClientSize.Width - carteConfiguration.Width) / 2;
                 carteConfiguration.Top = (panelConfiguration.ClientSize.Height - carteConfiguration.Height) / 2;
             }
+
+            if (carteChargement != null)
+            {
+                carteChargement.Left = (panelChargement.ClientSize.Width - carteChargement.Width) / 2;
+                carteChargement.Top = (panelChargement.ClientSize.Height - carteChargement.Height) / 2;
+            }
         }
 
         private void AfficherMenuPrincipal()
@@ -328,6 +437,7 @@ namespace jeu_de_point
             etatEcran = EtatEcran.MenuPrincipal;
             panelMenu.Visible = true;
             panelConfiguration.Visible = false;
+            panelChargement.Visible = false;
             panelActionsPartie.Visible = false;
             panelMenu.BringToFront();
             RecentrerLayout();
@@ -346,6 +456,131 @@ namespace jeu_de_point
             Invalidate();
         }
 
+        private void AfficherChargementPartie()
+        {
+            etatEcran = EtatEcran.ChargementPartie;
+            panelMenu.Visible = false;
+            panelConfiguration.Visible = false;
+            panelChargement.Visible = true;
+            panelActionsPartie.Visible = false;
+            panelChargement.BringToFront();
+            ChargerListeParties();
+            RecentrerLayout();
+            PositionnerBoutonsHautDroite();
+            Invalidate();
+        }
+
+        private void ChargerListeParties()
+        {
+            try
+            {
+                var parties = connexion.ListerParties();
+                listeParties.DataSource = null;
+                listeParties.DataSource = parties;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erreur de lecture des parties: {ex.Message}", "Base de donnï¿½es", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ChargerPartieSelectionnee()
+        {
+            if (listeParties.SelectedItem is not PartieResume partie)
+            {
+                return;
+            }
+
+            try
+            {
+                var etat = connexion.ChargerEtatPartie(partie.Id);
+                if (etat is null)
+                {
+                    MessageBox.Show("Partie introuvable.", "Charger une partie", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                RestaurerEtatPartie(etat);
+
+                etatEcran = EtatEcran.Partie;
+                panelMenu.Visible = false;
+                panelConfiguration.Visible = false;
+                panelChargement.Visible = false;
+                panelActionsPartie.Visible = true;
+                panelActionsPartie.BringToFront();
+                PositionnerBoutonsHautDroite();
+                Invalidate();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erreur de chargement: {ex.Message}", "Base de donnï¿½es", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void SupprimerPartieSelectionnee()
+        {
+            if (listeParties.SelectedItem is not PartieResume partie)
+            {
+                return;
+            }
+
+            var confirmation = MessageBox.Show(
+                $"Voulez-vous vraiment supprimer la partie #{partie.Id} ?\nCette action est irrï¿½versible.",
+                "Confirmer la suppression",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (confirmation != DialogResult.Yes)
+            {
+                return;
+            }
+
+            try
+            {
+                connexion.SupprimerPartie(partie.Id);
+                ChargerListeParties();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erreur de suppression: {ex.Message}", "Base de donnï¿½es", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void RestaurerEtatPartie(EtatPartieSauvegarde etat)
+        {
+            gridLines = etat.GridLines;
+            InitialiserJoueursEtTour();
+
+            joueurs[0].DefinirScore(etat.ScoreJ1);
+            joueurs[1].DefinirScore(etat.ScoreJ2);
+            indexJoueurCourant = Math.Clamp(etat.IndexJoueurCourant, 0, joueurs.Length - 1);
+
+            positionsCanonY = [
+                Math.Clamp(etat.CanonYJ1, 0, gridLines - 1),
+                Math.Clamp(etat.CanonYJ2, 0, gridLines - 1)
+            ];
+
+            pointsPoses.Clear();
+            foreach (var p in etat.Points)
+            {
+                if (p.JoueurIndex >= 0 && p.JoueurIndex < joueurs.Length)
+                {
+                    pointsPoses[(p.Col, p.Row)] = joueurs[p.JoueurIndex];
+                }
+            }
+
+            lignesAlignements.Clear();
+            foreach (var l in etat.Lignes)
+            {
+                lignesAlignements.Add(((l.DebutCol, l.DebutRow), (l.FinCol, l.FinRow), Color.FromArgb(l.CouleurArgb)));
+            }
+
+            partieCouranteId = etat.PartieId;
+            ordreAction = connexion.Scalar(
+                "SELECT COALESCE(MAX(ordre_action), 0) FROM actions_partie WHERE partie_id = @partieId",
+                new Dictionary<string, object?> { ["partieId"] = etat.PartieId }) is int i ? i : 0;
+        }
+
         private void DemarrerNouvellePartie(int valeurGridLines)
         {
             gridLines = Math.Max(2, valeurGridLines);
@@ -355,16 +590,33 @@ namespace jeu_de_point
             InitialiserJoueursEtTour();
             positionsCanonY = Enumerable.Repeat(0, joueurs.Length).ToArray();
 
+            try
+            {
+                var etat = ConstruireEtatPartie();
+                partieCouranteId = connexion.CreerPartie(etat);
+                ordreAction = 0;
+                SauvegarderActionAuto(0, "DEBUT_PARTIE", new Dictionary<string, object?>
+                {
+                    ["gridLines"] = gridLines
+                });
+            }
+            catch (Exception ex)
+            {
+                partieCouranteId = null;
+                MessageBox.Show($"Connexion PostgreSQL indisponible: {ex.Message}", "Base de donnï¿½es", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+
             etatEcran = EtatEcran.Partie;
             panelMenu.Visible = false;
             panelConfiguration.Visible = false;
+            panelChargement.Visible = false;
             panelActionsPartie.Visible = true;
             panelActionsPartie.BringToFront();
             PositionnerBoutonsHautDroite();
             Invalidate();
         }
 
-        // Méthode isolée pour initialiser les joueurs et le tour
+        // Mï¿½thode isolï¿½e pour initialiser les joueurs et le tour
         private void InitialiserJoueursEtTour()
         {
             joueurs =
@@ -383,7 +635,7 @@ namespace jeu_de_point
             indexJoueurCourant = (indexJoueurCourant + 1) % joueurs.Length;
         }
 
-        // Normaliser une ligne pour que Debut <= Fin (lexicographique) afin d'éviter les doublons inversés
+        // Normaliser une ligne pour que Debut <= Fin (lexicographique) afin d'ï¿½viter les doublons inversï¿½s
         private ((int Col, int Row) Debut, (int Col, int Row) Fin) NormaliserLigne((int Col, int Row) a, (int Col, int Row) b)
         {
             if (a.Col < b.Col) return (a, b);
@@ -392,7 +644,7 @@ namespace jeu_de_point
             return (b, a);
         }
 
-        // Méthode isolée: détecter 5 points alignés (horizontale, verticale, oblique)
+        // Mï¿½thode isolï¿½e: dï¿½tecter 5 points alignï¿½s (horizontale, verticale, oblique)
         private bool TryTrouverAlignementCinq((int Col, int Row) pointJoue, Joueur joueur, out ((int Col, int Row) Debut, (int Col, int Row) Fin) ligne)
         {
             ligne = default;
@@ -477,6 +729,12 @@ namespace jeu_de_point
                     joueurQuiJoue.AjouterPoint();
                 }
             }
+
+            SauvegarderActionAuto(indexJoueurCourant, "ClicSouris", new Dictionary<string, object?>
+            {
+                ["Col"] = intersection.Col,
+                ["Row"] = intersection.Row
+            });
 
             PasserAuJoueurSuivant();
             Invalidate();
@@ -564,6 +822,13 @@ namespace jeu_de_point
                 }
             }
 
+            SauvegarderActionAuto(tireurIndex, "Tir", new Dictionary<string, object?>
+            {
+                ["Puissance"] = puissance,
+                ["ColonneImpact"] = cibleCol,
+                ["LigneImpact"] = cibleRow
+            });
+
             PasserAuJoueurSuivant();
             Invalidate();
         }
@@ -573,8 +838,8 @@ namespace jeu_de_point
             int maxCol = gridLines - 1;
             int puissanceBornee = Math.Clamp(puissance, PuissanceMin, PuissanceMax);
 
-            // Règle de trois sur des colonnes 1..gridLines, puis conversion en index 0-based.
-            // Exemple gridLines=10, puissance=8 => 8*10/9 = 8.88 -> 8 (partie entière) -> index 7.
+            // Rï¿½gle de trois sur des colonnes 1..gridLines, puis conversion en index 0-based.
+            // Exemple gridLines=10, puissance=8 => 8*10/9 = 8.88 -> 8 (partie entiï¿½re) -> index 7.
             double projectionColonne1Based = (puissanceBornee * gridLines) / (double)PuissanceMax;
             int colonne1Based = Math.Max(1, (int)Math.Floor(projectionColonne1Based));
             int colDepuisGauche = Math.Clamp(colonne1Based - 1, 0, maxCol);
@@ -637,7 +902,7 @@ namespace jeu_de_point
             return (dColSegment * dRowPoint) == (dRowSegment * dColPoint);
         }
 
-        // Méthode isolée pour dessiner l'information du tour
+        // Mï¿½thode isolï¿½e pour dessiner l'information du tour
         private void DessinerTourCourant(Graphics g)
         {
             if (joueurs.Length == 0)
@@ -650,7 +915,7 @@ namespace jeu_de_point
             string[] informations =
             [
                 $"Tour: {JoueurCourant.Nom}",
-                "Flèches Haut/Bas: déplacer Y canon",
+                "Flï¿½ches Haut/Bas: dï¿½placer Y canon",
                 "CTRL + 1..9: Tir (puissance)"
             ];
 
@@ -719,7 +984,7 @@ namespace jeu_de_point
             g.FillEllipse(brush, xProjectile - 5, y - 5, 10, 10);
         }
 
-        // Méthode isolée pour dessiner le score des joueurs au-dessus de la grille
+        // Mï¿½thode isolï¿½e pour dessiner le score des joueurs au-dessus de la grille
         private void DessinerScores(Graphics g)
         {
             if (joueurs.Length == 0)
@@ -767,7 +1032,7 @@ namespace jeu_de_point
             }
         }
 
-        // Méthode isolée pour dessiner toutes les lignes d'alignement déjà trouvées
+        // Mï¿½thode isolï¿½e pour dessiner toutes les lignes d'alignement dï¿½jï¿½ trouvï¿½es
         private void DessinerLignesAlignement(Graphics g, int startX, int startY, float step)
         {
             if (lignesAlignements.Count == 0)
@@ -812,7 +1077,7 @@ namespace jeu_de_point
             g.DrawString(texte, fontTexte, brushPoint, xTexte, yTexte);
         }
 
-        // Méthode isolée pour dessiner les canons et leurs indicateurs Y
+        // Mï¿½thode isolï¿½e pour dessiner les canons et leurs indicateurs Y
         private void DessinerCanons(Graphics g, int startX, int startY, int gridSize, float step)
         {
             if (joueurs.Length < 2 || positionsCanonY.Length != joueurs.Length)
@@ -827,7 +1092,7 @@ namespace jeu_de_point
             DessinerCanonEtIndicateur(g, rectCanonDroit, joueurs[1].Couleur, positionsCanonY[1], step, estGauche: false);
         }
 
-        // Méthode isolée pour dessiner la grille, appelable depuis d'autres endroits
+        // Mï¿½thode isolï¿½e pour dessiner la grille, appelable depuis d'autres endroits
         private void dessinerTerrain(Graphics g)
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -862,15 +1127,15 @@ namespace jeu_de_point
                 g.FillEllipse(brush, x - rayonPoint, y - rayonPoint, rayonPoint * 2, rayonPoint * 2);
             }
 
-            // Dessiner toutes les lignes déjà trouvées (persistantes)
+            // Dessiner toutes les lignes dï¿½jï¿½ trouvï¿½es (persistantes)
             DessinerLignesAlignement(g, startX, startY, step);
 
-            // Dessiner les canons des joueurs et l'indicateur de coordonnée Y
+            // Dessiner les canons des joueurs et l'indicateur de coordonnï¿½e Y
             DessinerCanons(g, startX, startY, gridSize, step);
             DessinerAnimationTir(g, startX, startY, gridSize, step);
         }
 
-        // Méthode isolée: transforme un clic en intersection la plus proche
+        // Mï¿½thode isolï¿½e: transforme un clic en intersection la plus proche
         private bool TryGetNearestIntersection(Point clickPoint, out (int Col, int Row) intersection)
         {
             intersection = default;
@@ -920,6 +1185,80 @@ namespace jeu_de_point
 
             step = gridSize / (float)(gridLines - 1);
             return true;
+        }
+
+        private EtatPartieSauvegarde ConstruireEtatPartie()
+        {
+            var points = new List<PointSauvegarde>();
+            foreach (var point in pointsPoses)
+            {
+                int joueurIndex = Array.FindIndex(joueurs, j => ReferenceEquals(j, point.Value));
+                if (joueurIndex >= 0)
+                {
+                    points.Add(new PointSauvegarde
+                    {
+                        Col = point.Key.Col,
+                        Row = point.Key.Row,
+                        JoueurIndex = joueurIndex
+                    });
+                }
+            }
+
+            var lignes = lignesAlignements.Select(l => new LigneSauvegarde
+            {
+                DebutCol = l.Debut.Col,
+                DebutRow = l.Debut.Row,
+                FinCol = l.Fin.Col,
+                FinRow = l.Fin.Row,
+                CouleurArgb = l.Couleur.ToArgb()
+            }).ToList();
+
+            return new EtatPartieSauvegarde
+            {
+                PartieId = partieCouranteId ?? 0,
+                GridLines = gridLines,
+                IndexJoueurCourant = indexJoueurCourant,
+                ScoreJ1 = joueurs.Length > 0 ? joueurs[0].Score : 0,
+                ScoreJ2 = joueurs.Length > 1 ? joueurs[1].Score : 0,
+                CanonYJ1 = positionsCanonY.Length > 0 ? positionsCanonY[0] : 0,
+                CanonYJ2 = positionsCanonY.Length > 1 ? positionsCanonY[1] : 0,
+                Points = points,
+                Lignes = lignes
+            };
+        }
+
+        private void SauvegarderActionAuto(int joueurIndex, string typeAction, Dictionary<string, object?> details)
+        {
+            if (partieCouranteId is null)
+            {
+                return;
+            }
+
+            try
+            {
+                var etat = ConstruireEtatPartie();
+                connexion.MettreAJourEtatPartie(partieCouranteId.Value, etat);
+
+                ordreAction++;
+                connexion.AjouterAction(new ActionPartie
+                {
+                    PartieId = partieCouranteId.Value,
+                    OrdreAction = ordreAction,
+                    JoueurIndex = joueurIndex,
+                    TypeAction = typeAction,
+                    Details = details
+                });
+
+                erreurSauvegardeAffichee = false;
+            }
+            catch (Exception ex)
+            {
+                if (!erreurSauvegardeAffichee)
+                {
+                    erreurSauvegardeAffichee = true;
+                    MessageBox.Show($"Sauvegarde automatique indisponible: {ex.Message}", "Base de donnï¿½es", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
         }
 
         public Form1()
