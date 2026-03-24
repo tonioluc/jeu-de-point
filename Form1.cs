@@ -571,14 +571,20 @@ namespace jeu_de_point
         private int CalculerColonneImpactDepuisPuissance(int tireurIndex, int puissance)
         {
             int maxCol = gridLines - 1;
-            int distance = (puissance * maxCol) / PuissanceMax;
+            int puissanceBornee = Math.Clamp(puissance, PuissanceMin, PuissanceMax);
+
+            // Règle de trois sur des colonnes 1..gridLines, puis conversion en index 0-based.
+            // Exemple gridLines=10, puissance=8 => 8*10/9 = 8.88 -> 8 (partie entière) -> index 7.
+            double projectionColonne1Based = (puissanceBornee * gridLines) / (double)PuissanceMax;
+            int colonne1Based = Math.Max(1, (int)Math.Floor(projectionColonne1Based));
+            int colDepuisGauche = Math.Clamp(colonne1Based - 1, 0, maxCol);
 
             if (tireurIndex == 0)
             {
-                return Math.Clamp(distance, 0, maxCol);
+                return colDepuisGauche;
             }
 
-            return Math.Clamp(maxCol - distance, 0, maxCol);
+            return maxCol - colDepuisGauche;
         }
 
         private void DemarrerAnimationTir(int tireurIndex, int cibleCol, int cibleRow)
@@ -639,9 +645,51 @@ namespace jeu_de_point
                 return;
             }
 
-            string texte = $"Tour: {JoueurCourant.Nom}  |  Flèches Haut/Bas: Y canon  |  CTRL+1..9: Tir";
-            using var brush = new SolidBrush(JoueurCourant.Couleur);
-            g.DrawString(texte, Font, brush, 20, 20);
+            using var fontInfo = new Font(Font.FontFamily, 10.5f, FontStyle.Bold);
+
+            string[] informations =
+            [
+                $"Tour: {JoueurCourant.Nom}",
+                "Flèches Haut/Bas: déplacer Y canon",
+                "CTRL + 1..9: Tir (puissance)"
+            ];
+
+            Color[] fonds =
+            [
+                Color.FromArgb(226, 240, 255),
+                Color.FromArgb(234, 246, 236),
+                Color.FromArgb(255, 241, 222)
+            ];
+
+            Color[] bordures =
+            [
+                Color.FromArgb(49, 112, 194),
+                Color.FromArgb(62, 145, 95),
+                Color.FromArgb(198, 128, 34)
+            ];
+
+            float x = 12f;
+            float y = 12f;
+            float largeurMax = informations.Max(texte => g.MeasureString(texte, fontInfo).Width) + 24f;
+            float hauteurBloc = g.MeasureString("Ag", fontInfo).Height + 12f;
+
+            for (int i = 0; i < informations.Length; i++)
+            {
+                var rect = new RectangleF(x, y, largeurMax, hauteurBloc);
+                DessinerBlocInfo(g, rect, informations[i], fontInfo, fonds[i], bordures[i]);
+                y += hauteurBloc + 8f;
+            }
+        }
+
+        private void DessinerBlocInfo(Graphics g, RectangleF rect, string texte, Font font, Color fond, Color bordure)
+        {
+            using var brushFond = new SolidBrush(fond);
+            using var penBordure = new Pen(bordure, 1.6f);
+            using var brushTexte = new SolidBrush(Color.FromArgb(30, 30, 30));
+
+            g.FillRectangle(brushFond, rect);
+            g.DrawRectangle(penBordure, rect.X, rect.Y, rect.Width, rect.Height);
+            g.DrawString(texte, font, brushTexte, rect.X + 10f, rect.Y + 6f);
         }
 
         private void DessinerAnimationTir(Graphics g, int startX, int startY, int gridSize, float step)
