@@ -15,11 +15,20 @@ namespace jeu_de_point
         private const int PaddingAroundGrid = 60;
         private const int CanonWidth = 20;
         private const int CanonGap = 20;
+        private const int PuissanceMin = 1;
+        private const int PuissanceMax = 9;
 
         private readonly Dictionary<(int Col, int Row), Joueur> pointsPoses = new();
         private Joueur[] joueurs = Array.Empty<Joueur>();
         private int indexJoueurCourant;
         private int[] positionsCanonY = Array.Empty<int>();
+
+        private readonly System.Windows.Forms.Timer timerAnimationTir = new() { Interval = 25 };
+        private bool animationTirActive;
+        private DateTime animationTirDebut;
+        private int animationTireurIndex;
+        private int animationCibleCol;
+        private int animationCibleRow;
 
         private EtatEcran etatEcran = EtatEcran.MenuPrincipal;
 
@@ -51,6 +60,26 @@ namespace jeu_de_point
         {
             KeyPreview = true;
             KeyDown += Form1_KeyDown;
+        }
+
+        private void InitialiserAnimationTir()
+        {
+            timerAnimationTir.Tick += (_, _) =>
+            {
+                if (!animationTirActive)
+                {
+                    timerAnimationTir.Stop();
+                    return;
+                }
+
+                if ((DateTime.UtcNow - animationTirDebut).TotalMilliseconds >= 220)
+                {
+                    animationTirActive = false;
+                    timerAnimationTir.Stop();
+                }
+
+                Invalidate();
+            };
         }
 
         private void ConfigurerStyleBouton(Button bouton, Color fond, Color texte)
@@ -460,6 +489,19 @@ namespace jeu_de_point
                 return;
             }
 
+            if (e.Control)
+            {
+                int puissance = ExtrairePuissanceDepuisTouche(e.KeyCode);
+                if (puissance >= PuissanceMin)
+                {
+                    ExecuterTir(puissance);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                }
+
+                return;
+            }
+
             int index = indexJoueurCourant;
             int anciennePosition = positionsCanonY[index];
 
@@ -485,56 +527,108 @@ namespace jeu_de_point
             e.SuppressKeyPress = true;
         }
 
-        // Méthode isolée: transforme un clic en intersection la plus proche
-        private bool TryGetNearestIntersection(Point clickPoint, out (int Col, int Row) intersection)
+        private int ExtrairePuissanceDepuisTouche(Keys keyCode)
         {
-            intersection = default;
-
-            if (!TryGetGridGeometry(out int startX, out int startY, out int gridSize, out float step))
+            return keyCode switch
             {
-                return false;
-            }
-
-            int nearestCol = (int)Math.Round((clickPoint.X - startX) / step);
-            int nearestRow = (int)Math.Round((clickPoint.Y - startY) / step);
-
-            nearestCol = Math.Clamp(nearestCol, 0, gridLines - 1);
-            nearestRow = Math.Clamp(nearestRow, 0, gridLines - 1);
-
-            float intersectionX = startX + (nearestCol * step);
-            float intersectionY = startY + (nearestRow * step);
-
-            float dx = clickPoint.X - intersectionX;
-            float dy = clickPoint.Y - intersectionY;
-            float distance = (float)Math.Sqrt((dx * dx) + (dy * dy));
-
-            float maxSnapDistance = step * 0.45f;
-            if (distance > maxSnapDistance)
-            {
-                return false;
-            }
-
-            intersection = (nearestCol, nearestRow);
-            return true;
+                Keys.D1 or Keys.NumPad1 => 1,
+                Keys.D2 or Keys.NumPad2 => 2,
+                Keys.D3 or Keys.NumPad3 => 3,
+                Keys.D4 or Keys.NumPad4 => 4,
+                Keys.D5 or Keys.NumPad5 => 5,
+                Keys.D6 or Keys.NumPad6 => 6,
+                Keys.D7 or Keys.NumPad7 => 7,
+                Keys.D8 or Keys.NumPad8 => 8,
+                Keys.D9 or Keys.NumPad9 => 9,
+                _ => 0
+            };
         }
 
-        private bool TryGetGridGeometry(out int startX, out int startY, out int gridSize, out float step)
+        private void ExecuterTir(int puissance)
         {
-            int usableWidth = ClientSize.Width - (PaddingAroundGrid * 2);
-            int usableHeight = ClientSize.Height - (PaddingAroundGrid * 2);
-            gridSize = Math.Max(100, Math.Min(usableWidth, usableHeight));
+            int tireurIndex = indexJoueurCourant;
+            int cibleRow = positionsCanonY[tireurIndex];
+            int cibleCol = CalculerColonneImpactDepuisPuissance(tireurIndex, puissance);
+            var cible = (Col: cibleCol, Row: cibleRow);
 
-            startX = (ClientSize.Width - gridSize) / 2;
-            startY = (ClientSize.Height - gridSize) / 2;
+            DemarrerAnimationTir(tireurIndex, cibleCol, cibleRow);
 
-            if (gridLines < 2)
+            if (pointsPoses.TryGetValue(cible, out var joueurTouche))
             {
-                step = 0;
+                var tireur = joueurs[tireurIndex];
+                bool pointAdverse = !ReferenceEquals(joueurTouche, tireur);
+
+                if (pointAdverse && !PointEstProtegeParAlignement(cible, joueurTouche))
+                {
+                    pointsPoses.Remove(cible);
+                }
+            }
+
+            PasserAuJoueurSuivant();
+            Invalidate();
+        }
+
+        private int CalculerColonneImpactDepuisPuissance(int tireurIndex, int puissance)
+        {
+            int maxCol = gridLines - 1;
+            int distance = (puissance * maxCol) / PuissanceMax;
+
+            if (tireurIndex == 0)
+            {
+                return Math.Clamp(distance, 0, maxCol);
+            }
+
+            return Math.Clamp(maxCol - distance, 0, maxCol);
+        }
+
+        private void DemarrerAnimationTir(int tireurIndex, int cibleCol, int cibleRow)
+        {
+            animationTirActive = true;
+            animationTirDebut = DateTime.UtcNow;
+            animationTireurIndex = tireurIndex;
+            animationCibleCol = cibleCol;
+            animationCibleRow = cibleRow;
+            timerAnimationTir.Start();
+        }
+
+        private bool PointEstProtegeParAlignement((int Col, int Row) point, Joueur joueur)
+        {
+            int argb = joueur.Couleur.ToArgb();
+
+            foreach (var ligne in lignesAlignements)
+            {
+                if (ligne.Couleur.ToArgb() != argb)
+                {
+                    continue;
+                }
+
+                if (PointAppartientSegment(point, ligne.Debut, ligne.Fin))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool PointAppartientSegment((int Col, int Row) point, (int Col, int Row) debut, (int Col, int Row) fin)
+        {
+            int minCol = Math.Min(debut.Col, fin.Col);
+            int maxCol = Math.Max(debut.Col, fin.Col);
+            int minRow = Math.Min(debut.Row, fin.Row);
+            int maxRow = Math.Max(debut.Row, fin.Row);
+
+            if (point.Col < minCol || point.Col > maxCol || point.Row < minRow || point.Row > maxRow)
+            {
                 return false;
             }
 
-            step = gridSize / (float)(gridLines - 1);
-            return true;
+            int dColSegment = fin.Col - debut.Col;
+            int dRowSegment = fin.Row - debut.Row;
+            int dColPoint = point.Col - debut.Col;
+            int dRowPoint = point.Row - debut.Row;
+
+            return (dColSegment * dRowPoint) == (dRowSegment * dColPoint);
         }
 
         // Méthode isolée pour dessiner l'information du tour
@@ -545,9 +639,36 @@ namespace jeu_de_point
                 return;
             }
 
-            string texte = $"Tour: {JoueurCourant.Nom}";
+            string texte = $"Tour: {JoueurCourant.Nom}  |  Flèches Haut/Bas: Y canon  |  CTRL+1..9: Tir";
             using var brush = new SolidBrush(JoueurCourant.Couleur);
             g.DrawString(texte, Font, brush, 20, 20);
+        }
+
+        private void DessinerAnimationTir(Graphics g, int startX, int startY, int gridSize, float step)
+        {
+            if (!animationTirActive || joueurs.Length == 0)
+            {
+                return;
+            }
+
+            float progression = (float)((DateTime.UtcNow - animationTirDebut).TotalMilliseconds / 220d);
+            progression = Math.Clamp(progression, 0f, 1f);
+
+            int tireurIndex = Math.Clamp(animationTireurIndex, 0, joueurs.Length - 1);
+            int row = Math.Clamp(animationCibleRow, 0, gridLines - 1);
+            int col = Math.Clamp(animationCibleCol, 0, gridLines - 1);
+
+            float y = startY + (row * step);
+            float xOrigine = tireurIndex == 0 ? startX - CanonGap : startX + gridSize + CanonGap;
+            float xCible = startX + (col * step);
+            float xProjectile = xOrigine + ((xCible - xOrigine) * progression);
+
+            using var pen = new Pen(joueurs[tireurIndex].Couleur, 1.8f);
+            pen.DashStyle = DashStyle.Dot;
+            g.DrawLine(pen, xOrigine, y, xProjectile, y);
+
+            using var brush = new SolidBrush(joueurs[tireurIndex].Couleur);
+            g.FillEllipse(brush, xProjectile - 5, y - 5, 10, 10);
         }
 
         // Méthode isolée pour dessiner le score des joueurs au-dessus de la grille
@@ -698,6 +819,59 @@ namespace jeu_de_point
 
             // Dessiner les canons des joueurs et l'indicateur de coordonnée Y
             DessinerCanons(g, startX, startY, gridSize, step);
+            DessinerAnimationTir(g, startX, startY, gridSize, step);
+        }
+
+        // Méthode isolée: transforme un clic en intersection la plus proche
+        private bool TryGetNearestIntersection(Point clickPoint, out (int Col, int Row) intersection)
+        {
+            intersection = default;
+
+            if (!TryGetGridGeometry(out int startX, out int startY, out _, out float step))
+            {
+                return false;
+            }
+
+            int nearestCol = (int)Math.Round((clickPoint.X - startX) / step);
+            int nearestRow = (int)Math.Round((clickPoint.Y - startY) / step);
+
+            nearestCol = Math.Clamp(nearestCol, 0, gridLines - 1);
+            nearestRow = Math.Clamp(nearestRow, 0, gridLines - 1);
+
+            float intersectionX = startX + (nearestCol * step);
+            float intersectionY = startY + (nearestRow * step);
+
+            float dx = clickPoint.X - intersectionX;
+            float dy = clickPoint.Y - intersectionY;
+            float distance = (float)Math.Sqrt((dx * dx) + (dy * dy));
+
+            float maxSnapDistance = step * 0.45f;
+            if (distance > maxSnapDistance)
+            {
+                return false;
+            }
+
+            intersection = (nearestCol, nearestRow);
+            return true;
+        }
+
+        private bool TryGetGridGeometry(out int startX, out int startY, out int gridSize, out float step)
+        {
+            int usableWidth = ClientSize.Width - (PaddingAroundGrid * 2);
+            int usableHeight = ClientSize.Height - (PaddingAroundGrid * 2);
+            gridSize = Math.Max(100, Math.Min(usableWidth, usableHeight));
+
+            startX = (ClientSize.Width - gridSize) / 2;
+            startY = (ClientSize.Height - gridSize) / 2;
+
+            if (gridLines < 2)
+            {
+                step = 0;
+                return false;
+            }
+
+            step = gridSize / (float)(gridLines - 1);
+            return true;
         }
 
         public Form1()
@@ -710,6 +884,7 @@ namespace jeu_de_point
             positionsCanonY = Enumerable.Repeat(0, joueurs.Length).ToArray();
             InitialiserEcouteSouris();
             InitialiserEcouteClavier();
+            InitialiserAnimationTir();
             InitialiserEcranAccueil();
             AfficherMenuPrincipal();
         }
