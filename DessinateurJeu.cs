@@ -172,35 +172,70 @@ namespace jeu_de_point
         {
             using var fontInfo = new Font(baseFont.FontFamily, Theme.HudTaillePolice, FontStyle.Bold);
 
-            string[] informations =
+            float x = Theme.HudMargeGauche;
+            float y = Theme.HudMargeHaut;
+            float hauteurBloc = g.MeasureString("Ag", fontInfo).Height + (Theme.HudPaddingVertical * 2);
+
+            // Bloc ETU avec couleur vive
+            string texteEtu = ConfigEtudiant.ObtenirTexteComplet();
+            float largeurEtu = g.MeasureString(texteEtu, fontInfo).Width + (Theme.HudPaddingHorizontal * 2);
+            var rectEtu = new RectangleF(x, y, largeurEtu, hauteurBloc);
+            DessinerBlocInfo(g, rectEtu, texteEtu, Color.FromArgb(0, 120, 215), Color.FromArgb(0, 90, 180), fontInfo, Color.White);
+            y += hauteurBloc + Theme.HudEspacementBlocs;
+
+            // Bloc Tour avec couleur du joueur
+            string texteTour = "Tour: ";
+            string nomJoueur = joueurCourant.Nom;
+            float largeurTour = g.MeasureString(texteTour + nomJoueur, fontInfo).Width + (Theme.HudPaddingHorizontal * 2);
+            var rectTour = new RectangleF(x, y, largeurTour, hauteurBloc);
+            DessinerBlocTour(g, rectTour, texteTour, nomJoueur, joueurCourant.Couleur, fontInfo);
+            y += hauteurBloc + Theme.HudEspacementBlocs;
+
+            // Blocs d'instructions
+            string[] instructions =
             [
-                $"Tour: {joueurCourant.Nom}",
                 "Fleches Haut/Bas: deplacer Y canon",
                 "CTRL + 1..9: Tir (puissance)"
             ];
 
             var fonds = Theme.HudCouleursFond;
             var bordures = Theme.HudCouleursBordure;
+            float largeurMax = instructions.Max(texte => g.MeasureString(texte, fontInfo).Width) + (Theme.HudPaddingHorizontal * 2);
 
-            float x = Theme.HudMargeGauche;
-            float y = Theme.HudMargeHaut;
-            float largeurMax = informations.Max(texte => g.MeasureString(texte, fontInfo).Width) + (Theme.HudPaddingHorizontal * 2);
-            float hauteurBloc = g.MeasureString("Ag", fontInfo).Height + (Theme.HudPaddingVertical * 2);
-
-            for (int i = 0; i < informations.Length; i++)
+            for (int i = 0; i < instructions.Length; i++)
             {
                 var rect = new RectangleF(x, y, largeurMax, hauteurBloc);
                 var fond = i < fonds.Length ? fonds[i] : fonds[0];
                 var bordure = i < bordures.Length ? bordures[i] : bordures[0];
-                DessinerBlocInfo(g, rect, informations[i], fond, bordure, fontInfo);
+                DessinerBlocInfo(g, rect, instructions[i], fond, bordure, fontInfo, Color.FromArgb(240, 240, 240));
                 y += hauteurBloc + Theme.HudEspacementBlocs;
             }
         }
 
-        private void DessinerBlocInfo(Graphics g, RectangleF rect, string texte, Color fond, Color bordure, Font font)
+        private void DessinerBlocTour(Graphics g, RectangleF rect, string prefixe, string nomJoueur, Color couleurJoueur, Font font)
+        {
+            // Fond avec la couleur du joueur (semi-transparent)
+            using var brushFond = new SolidBrush(Color.FromArgb(180, couleurJoueur));
+            g.FillRectangle(brushFond, rect);
+
+            // Bordure avec la couleur du joueur
+            using var penBordure = new Pen(couleurJoueur, 2);
+            g.DrawRectangle(penBordure, rect.X, rect.Y, rect.Width, rect.Height);
+
+            // Texte "Tour: " en blanc
+            using var brushPrefixe = new SolidBrush(Color.White);
+            g.DrawString(prefixe, font, brushPrefixe, rect.X + Theme.HudPaddingHorizontal, rect.Y + Theme.HudPaddingVertical);
+
+            // Nom du joueur en jaune pour ressortir
+            float largeurPrefixe = g.MeasureString(prefixe, font).Width;
+            using var brushNom = new SolidBrush(Color.Yellow);
+            g.DrawString(nomJoueur, font, brushNom, rect.X + Theme.HudPaddingHorizontal + largeurPrefixe, rect.Y + Theme.HudPaddingVertical);
+        }
+
+        private void DessinerBlocInfo(Graphics g, RectangleF rect, string texte, Color fond, Color bordure, Font font, Color couleurTexte)
         {
             using var brushFond = new SolidBrush(fond);
-            using var brushTexte = new SolidBrush(Color.FromArgb(240, 240, 240));
+            using var brushTexte = new SolidBrush(couleurTexte);
 
             g.FillRectangle(brushFond, rect);
 
@@ -208,7 +243,6 @@ namespace jeu_de_point
             {
                 using var penBordure = new Pen(bordure, Theme.HudEpaisseurBordure);
                 g.DrawRectangle(penBordure, rect.X, rect.Y, rect.Width, rect.Height);
-                brushTexte.Color = Color.FromArgb(30, 30, 30);
             }
 
             g.DrawString(texte, font, brushTexte, rect.X + Theme.HudPaddingHorizontal, rect.Y + Theme.HudPaddingVertical);

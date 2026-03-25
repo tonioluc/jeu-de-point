@@ -23,6 +23,11 @@ namespace jeu_de_point
         public FlowLayoutPanel PanelActionsPartie { get; private set; } = null!;
         public FlowLayoutPanel PanelBoutonsConfiguration { get; private set; } = null!;
 
+        public Label LabelEtudiantMenu { get; private set; } = null!;
+        public Label LabelEtudiantConfiguration { get; private set; } = null!;
+        public Label LabelEtudiantChargement { get; private set; } = null!;
+        public Label LabelEtudiantPartie { get; private set; } = null!;
+
         public Button BoutonNouvellePartie { get; private set; } = null!;
         public Button BoutonChargerPartie { get; private set; } = null!;
         public Button BoutonRetourMenuConfiguration { get; private set; } = null!;
@@ -77,6 +82,9 @@ namespace jeu_de_point
                 BackColor = Theme.CouleurFondMenuPrincipal
             };
 
+            LabelEtudiantMenu = CreerLabelEtudiant();
+            PanelMenu.Controls.Add(LabelEtudiantMenu);
+
             var titreMenu = new Label
             {
                 AutoSize = true,
@@ -120,6 +128,9 @@ namespace jeu_de_point
                 BackColor = Theme.CouleurFondConfiguration,
                 Visible = false
             };
+
+            LabelEtudiantConfiguration = CreerLabelEtudiant();
+            PanelConfiguration.Controls.Add(LabelEtudiantConfiguration);
 
             // Panel pour les boutons en haut a droite
             PanelBoutonsConfiguration = new FlowLayoutPanel
@@ -196,6 +207,9 @@ namespace jeu_de_point
                 Visible = false
             };
 
+            LabelEtudiantChargement = CreerLabelEtudiant();
+            PanelChargement.Controls.Add(LabelEtudiantChargement);
+
             BoutonRetourMenuChargement = CreerBouton("Menu principal", Theme.TaillePoliceBoutonPetit, Theme.CouleurBoutonNeutre);
             BoutonRetourMenuChargement.Size = Theme.TailleBoutonRetour;
             BoutonRetourMenuChargement.Click += (_, _) => OnMenuPrincipalClick?.Invoke();
@@ -241,6 +255,10 @@ namespace jeu_de_point
 
         private void CreerPanelActionsPartie()
         {
+            LabelEtudiantPartie = CreerLabelEtudiant();
+            LabelEtudiantPartie.Visible = false;
+            parent.Controls.Add(LabelEtudiantPartie);
+
             PanelActionsPartie = new FlowLayoutPanel
             {
                 AutoSize = true,
@@ -339,12 +357,28 @@ namespace jeu_de_point
             return layout;
         }
 
+        private Label CreerLabelEtudiant()
+        {
+            return new Label
+            {
+                AutoSize = true,
+                Text = ConfigEtudiant.ObtenirTexteComplet(),
+                Font = new Font(baseFont.FontFamily, 14, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(0, 120, 215),
+                Padding = new Padding(10, 6, 10, 6),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+        }
+
         public void AfficherEcran(EtatEcran ecran)
         {
             PanelMenu.Visible = ecran == EtatEcran.MenuPrincipal;
             PanelConfiguration.Visible = ecran == EtatEcran.ConfigurationNouvellePartie;
             PanelChargement.Visible = ecran == EtatEcran.ChargementPartie;
             PanelActionsPartie.Visible = ecran == EtatEcran.Partie;
+            // Le label ETU de la partie est dessiné dans le HUD, pas besoin de l'afficher ici
+            LabelEtudiantPartie.Visible = false;
 
             switch (ecran)
             {
@@ -371,6 +405,21 @@ namespace jeu_de_point
             CentrerDansPannel(CarteMenu, PanelMenu);
             CentrerDansPannel(CarteConfiguration, PanelConfiguration);
             CentrerDansPannel(CarteChargement, PanelChargement);
+
+            // Centrer les labels ETU en haut
+            CentrerLabelEnHaut(LabelEtudiantMenu, PanelMenu);
+            CentrerLabelEnHaut(LabelEtudiantConfiguration, PanelConfiguration);
+            CentrerLabelEnHaut(LabelEtudiantChargement, PanelChargement);
+            CentrerLabelEnHaut(LabelEtudiantPartie, parent);
+        }
+
+        private void CentrerLabelEnHaut(Label label, Control container)
+        {
+            if (label != null && container != null)
+            {
+                label.Left = (container.ClientSize.Width - label.Width) / 2;
+                label.Top = 10;
+            }
         }
 
         private void CentrerDansPannel(Panel carte, Panel panel)
