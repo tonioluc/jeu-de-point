@@ -75,12 +75,56 @@ namespace jeu_de_point
                     continue;
                 }
 
-                int startIndex = Math.Clamp(indexPointJoue - 2, 0, sequence.Count - 5);
-                var debut = sequence[startIndex];
-                var fin = sequence[startIndex + 4];
+                // Chercher une fenêtre de 5 points avec au maximum 1 point par ligne existante
+                for (int startIndex = 0; startIndex <= sequence.Count - 5; startIndex++)
+                {
+                    // Vérifier que le point joué est inclus dans cette fenêtre
+                    if (indexPointJoue < startIndex || indexPointJoue > startIndex + 4)
+                    {
+                        continue;
+                    }
 
-                ligne = new LigneAlignement(debut, fin, joueur.Couleur);
-                return true;
+                    // Extraire les 5 points de cette fenêtre
+                    var pointsFenetre = new List<(int Col, int Row)>();
+                    for (int i = startIndex; i < startIndex + 5; i++)
+                    {
+                        pointsFenetre.Add(sequence[i]);
+                    }
+
+                    // Vérifier qu'aucune ligne existante ne contribue plus d'1 point
+                    bool valide = true;
+                    foreach (var ligneExistante in LignesAlignements)
+                    {
+                        if (ligneExistante.Couleur.ToArgb() != joueur.Couleur.ToArgb())
+                        {
+                            continue;
+                        }
+
+                        int pointsDeMemeLigne = 0;
+                        foreach (var pt in pointsFenetre)
+                        {
+                            if (ligneExistante.ContientPoint(pt))
+                            {
+                                pointsDeMemeLigne++;
+                            }
+                        }
+
+                        // Règle: maximum 1 point par ligne existante
+                        if (pointsDeMemeLigne > 1)
+                        {
+                            valide = false;
+                            break;
+                        }
+                    }
+
+                    if (valide)
+                    {
+                        var debut = sequence[startIndex];
+                        var fin = sequence[startIndex + 4];
+                        ligne = new LigneAlignement(debut, fin, joueur.Couleur);
+                        return true;
+                    }
+                }
             }
 
             return false;
@@ -115,6 +159,21 @@ namespace jeu_de_point
                 }
 
                 if (ligne.ContientPoint(point))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool PointEstDejaTrace((int Col, int Row) point, Color couleur)
+        {
+            int argb = couleur.ToArgb();
+
+            foreach (var ligne in LignesAlignements)
+            {
+                if (ligne.Couleur.ToArgb() == argb && ligne.ContientPoint(point))
                 {
                     return true;
                 }
