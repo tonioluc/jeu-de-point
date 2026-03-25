@@ -281,7 +281,6 @@ namespace jeu_de_point
             if (grille.PointsPoses.TryGetValue(cible, out var joueurTouche))
             {
                 bool pointAdverse = !ReferenceEquals(joueurTouche, tireur);
-                bool pointDansLigne = grille.PointEstDansUneLigne(cible);
 
                 if (pointAdverse && !grille.PointEstProtege(cible, joueurTouche))
                 {
@@ -292,6 +291,9 @@ namespace jeu_de_point
                     {
                         grille.PoserPoint(cibleCol, cibleRow, tireur);
 
+                        // Enregistrer car on pose un point (recuperation)
+                        grille.EnregistrerTir(cibleCol, cibleRow, indexJoueurCourant);
+
                         // Verifier si alignement 5
                         if (grille.TryTrouverAlignementCinq(cible, tireur, out var ligne))
                         {
@@ -301,10 +303,7 @@ namespace jeu_de_point
                             }
                         }
                     }
-                }
-                else if (!pointAdverse && !pointDansLigne)
-                {
-                    // C'est son propre point mais pas dans une ligne - aucun effet
+                    // Si on ne fait que detruire, on n'enregistre PAS le tir
                 }
             }
             else
@@ -314,6 +313,9 @@ namespace jeu_de_point
                 if (dejaTireSurCettePosition)
                 {
                     grille.PoserPoint(cibleCol, cibleRow, tireur);
+
+                    // Enregistrer car on pose un point (recuperation)
+                    grille.EnregistrerTir(cibleCol, cibleRow, indexJoueurCourant);
 
                     // Verifier si alignement 5
                     if (grille.TryTrouverAlignementCinq(cible, tireur, out var ligne))
@@ -325,9 +327,6 @@ namespace jeu_de_point
                     }
                 }
             }
-
-            // Enregistrer ce tir pour ce joueur
-            grille.EnregistrerTir(cibleCol, cibleRow, indexJoueurCourant);
 
             SauvegarderAction("Tir", new Dictionary<string, object?>
             {
