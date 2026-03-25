@@ -176,7 +176,7 @@ namespace jeu_de_point
             {
                 Minimum = 5,
                 Maximum = 30,
-                Value = 10,
+                Value = 9,
                 Width = Theme.LargeurInputGridLines,
                 Font = new Font(baseFont.FontFamily, Theme.TaillePoliceLabel, FontStyle.Regular),
                 Margin = new Padding(0, 0, 0, Theme.MargeEntreBoutons + 4)

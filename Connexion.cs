@@ -19,9 +19,9 @@ public sealed class Connexion
     {
         const string sql = @"
 INSERT INTO parties
-(date_creation, date_modification, grid_lines, index_joueur_courant, score_j1, score_j2, canon_y_j1, canon_y_j2, points_json, lignes_json)
+(date_creation, date_modification, grid_lines, index_joueur_courant, score_j1, score_j2, canon_y_j1, canon_y_j2, points_json, lignes_json, positions_tirees_json)
 VALUES
-(@dateCreation, @dateMaj, @gridLines, @indexJoueurCourant, @scoreJ1, @scoreJ2, @canonYJ1, @canonYJ2, @pointsJson::jsonb, @lignesJson::jsonb)
+(@dateCreation, @dateMaj, @gridLines, @indexJoueurCourant, @scoreJ1, @scoreJ2, @canonYJ1, @canonYJ2, @pointsJson::jsonb, @lignesJson::jsonb, @positionsTireesJson::jsonb)
 RETURNING id;";
 
         using var conn = new NpgsqlConnection(connectionString);
@@ -38,6 +38,7 @@ RETURNING id;";
         cmd.Parameters.AddWithValue("canonYJ2", etat.CanonYJ2);
         cmd.Parameters.AddWithValue("pointsJson", JsonSerializer.Serialize(etat.Points, jsonOptions));
         cmd.Parameters.AddWithValue("lignesJson", JsonSerializer.Serialize(etat.Lignes, jsonOptions));
+        cmd.Parameters.AddWithValue("positionsTireesJson", JsonSerializer.Serialize(etat.PositionsTirees, jsonOptions));
 
         return Convert.ToInt32(cmd.ExecuteScalar());
     }
@@ -54,7 +55,8 @@ SET date_modification = @dateMaj,
     canon_y_j1 = @canonYJ1,
     canon_y_j2 = @canonYJ2,
     points_json = @pointsJson::jsonb,
-    lignes_json = @lignesJson::jsonb
+    lignes_json = @lignesJson::jsonb,
+    positions_tirees_json = @positionsTireesJson::jsonb
 WHERE id = @id;";
 
         using var conn = new NpgsqlConnection(connectionString);
@@ -71,6 +73,7 @@ WHERE id = @id;";
         cmd.Parameters.AddWithValue("canonYJ2", etat.CanonYJ2);
         cmd.Parameters.AddWithValue("pointsJson", JsonSerializer.Serialize(etat.Points, jsonOptions));
         cmd.Parameters.AddWithValue("lignesJson", JsonSerializer.Serialize(etat.Lignes, jsonOptions));
+        cmd.Parameters.AddWithValue("positionsTireesJson", JsonSerializer.Serialize(etat.PositionsTirees, jsonOptions));
 
         cmd.ExecuteNonQuery();
     }
@@ -132,7 +135,7 @@ ORDER BY p.date_modification DESC;";
     public EtatPartieSauvegarde? ChargerEtatPartie(int partieId)
     {
         const string sql = @"
-SELECT id, grid_lines, index_joueur_courant, score_j1, score_j2, canon_y_j1, canon_y_j2, points_json, lignes_json
+SELECT id, grid_lines, index_joueur_courant, score_j1, score_j2, canon_y_j1, canon_y_j2, points_json, lignes_json, positions_tirees_json
 FROM parties
 WHERE id = @id;";
 
@@ -150,6 +153,7 @@ WHERE id = @id;";
 
         var pointsJson = reader.IsDBNull(7) ? "[]" : reader.GetString(7);
         var lignesJson = reader.IsDBNull(8) ? "[]" : reader.GetString(8);
+        var positionsTireesJson = reader.IsDBNull(9) ? "[]" : reader.GetString(9);
 
         return new EtatPartieSauvegarde
         {
@@ -161,7 +165,8 @@ WHERE id = @id;";
             CanonYJ1 = reader.GetInt32(5),
             CanonYJ2 = reader.GetInt32(6),
             Points = JsonSerializer.Deserialize<List<PointSauvegarde>>(pointsJson, jsonOptions) ?? [],
-            Lignes = JsonSerializer.Deserialize<List<LigneSauvegarde>>(lignesJson, jsonOptions) ?? []
+            Lignes = JsonSerializer.Deserialize<List<LigneSauvegarde>>(lignesJson, jsonOptions) ?? [],
+            PositionsTirees = JsonSerializer.Deserialize<List<PositionTireeSauvegarde>>(positionsTireesJson, jsonOptions) ?? []
         };
     }
 
@@ -267,6 +272,7 @@ public sealed class EtatPartieSauvegarde
     public int CanonYJ2 { get; init; }
     public List<PointSauvegarde> Points { get; init; } = [];
     public List<LigneSauvegarde> Lignes { get; init; } = [];
+    public List<PositionTireeSauvegarde> PositionsTirees { get; init; } = [];
 }
 
 public sealed class PointSauvegarde
@@ -283,6 +289,13 @@ public sealed class LigneSauvegarde
     public int FinCol { get; init; }
     public int FinRow { get; init; }
     public int CouleurArgb { get; init; }
+}
+
+public sealed class PositionTireeSauvegarde
+{
+    public int Col { get; init; }
+    public int Row { get; init; }
+    public int JoueurIndex { get; init; }
 }
 
 public sealed class ActionPartie

@@ -5,6 +5,7 @@ namespace jeu_de_point
         public int NombreLignes { get; private set; }
         public Dictionary<(int Col, int Row), Joueur> PointsPoses { get; } = new();
         public List<LigneAlignement> LignesAlignements { get; } = new();
+        public Dictionary<(int Col, int Row), HashSet<int>> PositionsTirees { get; } = new();
 
         public GrilleJeu(int nombreLignes)
         {
@@ -16,6 +17,23 @@ namespace jeu_de_point
             NombreLignes = Math.Max(2, nombreLignes);
             PointsPoses.Clear();
             LignesAlignements.Clear();
+            PositionsTirees.Clear();
+        }
+
+        public void EnregistrerTir(int col, int row, int joueurIndex)
+        {
+            var key = (col, row);
+            if (!PositionsTirees.TryGetValue(key, out var joueurs))
+            {
+                joueurs = new HashSet<int>();
+                PositionsTirees[key] = joueurs;
+            }
+            joueurs.Add(joueurIndex);
+        }
+
+        public bool JoueurADejaTireSurPosition(int col, int row, int joueurIndex)
+        {
+            return PositionsTirees.TryGetValue((col, row), out var joueurs) && joueurs.Contains(joueurIndex);
         }
 
         public bool PeutPoserPoint(int col, int row)
@@ -185,6 +203,19 @@ namespace jeu_de_point
             foreach (var ligne in LignesAlignements)
             {
                 if (ligne.Couleur.ToArgb() == argb && ligne.ContientPoint(point))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool PointEstDansUneLigne((int Col, int Row) point)
+        {
+            foreach (var ligne in LignesAlignements)
+            {
+                if (ligne.ContientPoint(point))
                 {
                     return true;
                 }

@@ -128,6 +128,20 @@ namespace jeu_de_point
                 CouleurArgb = l.Couleur.ToArgb()
             }).ToList();
 
+            var positionsTirees = new List<PositionTireeSauvegarde>();
+            foreach (var kvp in grille.PositionsTirees)
+            {
+                foreach (var joueurIndex in kvp.Value)
+                {
+                    positionsTirees.Add(new PositionTireeSauvegarde
+                    {
+                        Col = kvp.Key.Col,
+                        Row = kvp.Key.Row,
+                        JoueurIndex = joueurIndex
+                    });
+                }
+            }
+
             return new EtatPartieSauvegarde
             {
                 PartieId = partieCouranteId ?? 0,
@@ -138,7 +152,8 @@ namespace jeu_de_point
                 CanonYJ1 = canons.Length > 0 ? canons[0].PositionY : 0,
                 CanonYJ2 = canons.Length > 1 ? canons[1].PositionY : 0,
                 Points = points,
-                Lignes = lignes
+                Lignes = lignes,
+                PositionsTirees = positionsTirees
             };
         }
 
@@ -173,6 +188,11 @@ namespace jeu_de_point
                     (l.DebutCol, l.DebutRow),
                     (l.FinCol, l.FinRow),
                     Color.FromArgb(l.CouleurArgb)));
+            }
+
+            foreach (var pt in etat.PositionsTirees)
+            {
+                grille.EnregistrerTir(pt.Col, pt.Row, pt.JoueurIndex);
             }
         }
     }

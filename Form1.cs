@@ -204,6 +204,9 @@ namespace jeu_de_point
             var joueur = JoueurCourant;
             grille.PoserPoint(intersection.Col, intersection.Row, joueur);
 
+            // Enregistrer cette position pour ce joueur (pour la regle de recuperation)
+            grille.EnregistrerTir(intersection.Col, intersection.Row, indexJoueurCourant);
+
             if (grille.TryTrouverAlignementCinq(intersection, joueur, out var ligne))
             {
                 if (grille.AjouterLigneAlignementSiNouvelle(ligne))
@@ -272,16 +275,59 @@ namespace jeu_de_point
 
             animationTir.Demarrer(indexJoueurCourant, cibleCol, cibleRow);
 
+            var tireur = JoueurCourant;
+            bool dejaTireSurCettePosition = grille.JoueurADejaTireSurPosition(cibleCol, cibleRow, indexJoueurCourant);
+
             if (grille.PointsPoses.TryGetValue(cible, out var joueurTouche))
             {
-                var tireur = JoueurCourant;
                 bool pointAdverse = !ReferenceEquals(joueurTouche, tireur);
+                bool pointDansLigne = grille.PointEstDansUneLigne(cible);
 
                 if (pointAdverse && !grille.PointEstProtege(cible, joueurTouche))
                 {
                     grille.RetirerPoint(cible.Col, cible.Row);
+
+                    // Si le tireur a deja tire sur cette position, il recupere le point
+                    if (dejaTireSurCettePosition)
+                    {
+                        grille.PoserPoint(cibleCol, cibleRow, tireur);
+
+                        // Verifier si alignement 5
+                        if (grille.TryTrouverAlignementCinq(cible, tireur, out var ligne))
+                        {
+                            if (grille.AjouterLigneAlignementSiNouvelle(ligne))
+                            {
+                                tireur.AjouterPoint();
+                            }
+                        }
+                    }
+                }
+                else if (!pointAdverse && !pointDansLigne)
+                {
+                    // C'est son propre point mais pas dans une ligne - aucun effet
                 }
             }
+            else
+            {
+                // Pas de point sur cette position
+                // Si le tireur a deja tire ici, il peut poser son point
+                if (dejaTireSurCettePosition)
+                {
+                    grille.PoserPoint(cibleCol, cibleRow, tireur);
+
+                    // Verifier si alignement 5
+                    if (grille.TryTrouverAlignementCinq(cible, tireur, out var ligne))
+                    {
+                        if (grille.AjouterLigneAlignementSiNouvelle(ligne))
+                        {
+                            tireur.AjouterPoint();
+                        }
+                    }
+                }
+            }
+
+            // Enregistrer ce tir pour ce joueur
+            grille.EnregistrerTir(cibleCol, cibleRow, indexJoueurCourant);
 
             SauvegarderAction("Tir", new Dictionary<string, object?>
             {
