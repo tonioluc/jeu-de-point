@@ -91,29 +91,40 @@ namespace jeu_de_point
                         pointsFenetre.Add(sequence[i]);
                     }
 
-                    // Vérifier qu'aucune ligne existante ne contribue plus d'1 point
+                    // Vérifier qu'aucune ligne existante du même joueur ne contribue plus d'1 point
                     bool valide = true;
+                    var ligneCandidate = new LigneAlignement(pointsFenetre[0], pointsFenetre[4], joueur.Couleur);
+
                     foreach (var ligneExistante in LignesAlignements)
                     {
-                        if (ligneExistante.Couleur.ToArgb() != joueur.Couleur.ToArgb())
-                        {
-                            continue;
-                        }
+                        bool memeCouleur = ligneExistante.Couleur.ToArgb() == joueur.Couleur.ToArgb();
 
-                        int pointsDeMemeLigne = 0;
-                        foreach (var pt in pointsFenetre)
+                        if (memeCouleur)
                         {
-                            if (ligneExistante.ContientPoint(pt))
+                            // Règle 1: maximum 1 point par ligne existante du même joueur
+                            int pointsDeMemeLigne = 0;
+                            foreach (var pt in pointsFenetre)
                             {
-                                pointsDeMemeLigne++;
+                                if (ligneExistante.ContientPoint(pt))
+                                {
+                                    pointsDeMemeLigne++;
+                                }
+                            }
+
+                            if (pointsDeMemeLigne > 1)
+                            {
+                                valide = false;
+                                break;
                             }
                         }
-
-                        // Règle: maximum 1 point par ligne existante
-                        if (pointsDeMemeLigne > 1)
+                        else
                         {
-                            valide = false;
-                            break;
+                            // Règle 2: pas de chevauchement avec les lignes adverses
+                            if (ligneCandidate.ChevaucheLigne(ligneExistante))
+                            {
+                                valide = false;
+                                break;
+                            }
                         }
                     }
 
@@ -286,6 +297,73 @@ namespace jeu_de_point
             int dRowPoint = point.Row - Debut.Row;
 
             return (dColSegment * dRowPoint) == (dRowSegment * dColPoint);
+        }
+
+        public bool ChevaucheLigne(LigneAlignement autre)
+        {
+            // Deux segments se chevauchent s'ils s'intersectent (pas seulement aux extrémités)
+            // Utilise l'algorithme de détection d'intersection de segments
+
+            int x1 = Debut.Col, y1 = Debut.Row;
+            int x2 = Fin.Col, y2 = Fin.Row;
+            int x3 = autre.Debut.Col, y3 = autre.Debut.Row;
+            int x4 = autre.Fin.Col, y4 = autre.Fin.Row;
+
+            // Calcul des produits vectoriels
+            int d1 = Direction(x3, y3, x4, y4, x1, y1);
+            int d2 = Direction(x3, y3, x4, y4, x2, y2);
+            int d3 = Direction(x1, y1, x2, y2, x3, y3);
+            int d4 = Direction(x1, y1, x2, y2, x4, y4);
+
+            // Intersection générale (les segments se croisent)
+            if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+                ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0)))
+            {
+                return true;
+            }
+
+            // Cas colinéaires - vérifier le chevauchement
+            if (d1 == 0 && d2 == 0 && d3 == 0 && d4 == 0)
+            {
+                // Les segments sont colinéaires, vérifier s'ils se chevauchent
+                return SegmentsColineairesChevauchent(x1, y1, x2, y2, x3, y3, x4, y4);
+            }
+
+            return false;
+        }
+
+        private static int Direction(int ax, int ay, int bx, int by, int cx, int cy)
+        {
+            return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
+        }
+
+        private static bool SegmentsColineairesChevauchent(int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4)
+        {
+            // Projeter sur l'axe avec la plus grande variation
+            int minA, maxA, minB, maxB;
+
+            if (Math.Abs(x2 - x1) >= Math.Abs(y2 - y1))
+            {
+                // Projeter sur X
+                minA = Math.Min(x1, x2);
+                maxA = Math.Max(x1, x2);
+                minB = Math.Min(x3, x4);
+                maxB = Math.Max(x3, x4);
+            }
+            else
+            {
+                // Projeter sur Y
+                minA = Math.Min(y1, y2);
+                maxA = Math.Max(y1, y2);
+                minB = Math.Min(y3, y4);
+                maxB = Math.Max(y3, y4);
+            }
+
+            // Chevauchement si les intervalles se superposent (pas juste aux extrémités)
+            int overlapStart = Math.Max(minA, minB);
+            int overlapEnd = Math.Min(maxA, maxB);
+
+            return overlapEnd > overlapStart; // Chevauchement strict (> au lieu de >=)
         }
     }
 }
