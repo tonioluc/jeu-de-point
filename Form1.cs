@@ -252,13 +252,16 @@ namespace jeu_de_point
                 }
             }
 
-            SauvegarderAction("ClicSouris", new Dictionary<string, object?>
+            // Passer au joueur suivant AVANT de sauvegarder pour que l'etat reflète le bon tour
+            int joueurQuiAJoue = indexJoueurCourant;
+            PasserAuJoueurSuivant();
+
+            SauvegarderAction(joueurQuiAJoue, "ClicSouris", new Dictionary<string, object?>
             {
                 ["Col"] = intersection.Col,
                 ["Row"] = intersection.Row
             });
 
-            PasserAuJoueurSuivant();
             Invalidate();
         }
 
@@ -365,20 +368,23 @@ namespace jeu_de_point
                 }
             }
 
-            SauvegarderAction("Tir", new Dictionary<string, object?>
+            // Passer au joueur suivant AVANT de sauvegarder pour que l'etat reflète le bon tour
+            int joueurQuiAJoue = indexJoueurCourant;
+            PasserAuJoueurSuivant();
+
+            SauvegarderAction(joueurQuiAJoue, "Tir", new Dictionary<string, object?>
             {
                 ["Puissance"] = puissance,
                 ["ColonneImpact"] = cibleCol,
                 ["LigneImpact"] = cibleRow
             });
 
-            PasserAuJoueurSuivant();
             Invalidate();
         }
 
-        private void SauvegarderAction(string typeAction, Dictionary<string, object?> details)
+        private void SauvegarderAction(int joueurQuiAJoue, string typeAction, Dictionary<string, object?> details)
         {
-            sauvegarde.SauvegarderAction(indexJoueurCourant, typeAction, details,
+            sauvegarde.SauvegarderAction(joueurQuiAJoue, typeAction, details,
                 grille, joueurs, canons, indexJoueurCourant);
         }
 
