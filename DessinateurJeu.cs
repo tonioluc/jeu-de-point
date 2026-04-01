@@ -247,5 +247,121 @@ namespace jeu_de_point
 
             g.DrawString(texte, font, brushTexte, rect.X + Theme.HudPaddingHorizontal, rect.Y + Theme.HudPaddingVertical);
         }
+
+        public RectangleF DessinerBlocSuggestion(Graphics g, int nombrePointsGagnants, bool estActif, float yPosition)
+        {
+            return DessinerBlocSuggestionGenerique(g, "Nombre de 4", nombrePointsGagnants, estActif, yPosition,
+                Color.FromArgb(45, 125, 45), Color.FromArgb(60, 180, 60),
+                Color.FromArgb(60, 160, 60), Color.FromArgb(100, 220, 100));
+        }
+
+        public RectangleF DessinerBlocSuggestion3(Graphics g, int nombrePoints, bool estActif, float yPosition)
+        {
+            return DessinerBlocSuggestionGenerique(g, "Nombre de 3", nombrePoints, estActif, yPosition,
+                Color.FromArgb(180, 120, 30), Color.FromArgb(220, 160, 50),
+                Color.FromArgb(210, 150, 40), Color.FromArgb(255, 200, 80));
+        }
+
+        private RectangleF DessinerBlocSuggestionGenerique(Graphics g, string label, int nombre, bool estActif, float yPosition,
+            Color fondNormalActif, Color bordureNormalActif, Color fondActif, Color bordureActif)
+        {
+            using var fontInfo = new Font(baseFont.FontFamily, 12f, FontStyle.Bold);
+
+            float x = Theme.HudMargeGauche;
+            float y = yPosition;
+            float hauteurBloc = g.MeasureString("Ag", fontInfo).Height + (Theme.HudPaddingVertical * 2) + 8;
+
+            string texte = $"{label}: {nombre}";
+            float largeurBloc = g.MeasureString(texte, fontInfo).Width + (Theme.HudPaddingHorizontal * 2) + 10;
+
+            var rect = new RectangleF(x, y, largeurBloc, hauteurBloc);
+
+            // Couleur selon l'etat et si cliquable
+            Color fondNormal = nombre > 0 ? fondNormalActif : Color.FromArgb(80, 80, 80);
+            Color bordureNormal = nombre > 0 ? bordureNormalActif : Color.FromArgb(120, 120, 120);
+
+            // Si actif (suggestions affichees), couleur plus vive
+            Color fond = estActif ? fondActif : fondNormal;
+            Color bordure = estActif ? bordureActif : bordureNormal;
+
+            using var brushFond = new SolidBrush(fond);
+            using var penBordure = new Pen(bordure, 2.5f);
+
+            g.FillRectangle(brushFond, rect);
+            g.DrawRectangle(penBordure, rect.X, rect.Y, rect.Width, rect.Height);
+
+            // Texte
+            Color couleurTexte = nombre > 0 ? Color.White : Color.FromArgb(180, 180, 180);
+            using var brushTexte = new SolidBrush(couleurTexte);
+            float textY = rect.Y + ((rect.Height - fontInfo.Height) / 2);
+            g.DrawString(texte, fontInfo, brushTexte, rect.X + Theme.HudPaddingHorizontal + 5, textY);
+
+            // Indicateur "cliquable" si > 0
+            if (nombre > 0)
+            {
+                using var fontSmall = new Font(baseFont.FontFamily, 7f, FontStyle.Italic);
+                string hint = estActif ? "(cliquer pour masquer)" : "(cliquer pour afficher)";
+                using var brushHint = new SolidBrush(Color.FromArgb(200, 200, 200));
+                g.DrawString(hint, fontSmall, brushHint, rect.X + Theme.HudPaddingHorizontal + 5, rect.Bottom - 14);
+            }
+
+            return rect;
+        }
+
+        public void DessinerIndicateursSuggestion(Graphics g, List<(int Col, int Row)> pointsGagnants, GeometrieGrille geo, Color couleurJoueur)
+        {
+            DessinerIndicateursSuggestionAvecStyle(g, pointsGagnants, geo, couleurJoueur, System.Drawing.Drawing2D.DashStyle.Dash);
+        }
+
+        public void DessinerIndicateursSuggestion3(Graphics g, List<(int Col, int Row)> points, GeometrieGrille geo, Color couleurJoueur)
+        {
+            // Style different pour les suggestions de 3 (pointille plus large + etoile au lieu de +)
+            DessinerIndicateursSuggestionAvecStyle(g, points, geo, Color.FromArgb(255, 180, 50), System.Drawing.Drawing2D.DashStyle.Dot, true);
+        }
+
+        private void DessinerIndicateursSuggestionAvecStyle(Graphics g, List<(int Col, int Row)> points, GeometrieGrille geo,
+            Color couleur, System.Drawing.Drawing2D.DashStyle styleBordure, bool utiliserEtoile = false)
+        {
+            if (points.Count == 0)
+            {
+                return;
+            }
+
+            float rayonIndicateur = Math.Max(8f, geo.Step * 0.25f);
+
+            foreach (var point in points)
+            {
+                float x = geo.StartX + (point.Col * geo.Step);
+                float y = geo.StartY + (point.Row * geo.Step);
+
+                // Cercle semi-transparent
+                using var brushFond = new SolidBrush(Color.FromArgb(80, couleur));
+                g.FillEllipse(brushFond, x - rayonIndicateur, y - rayonIndicateur, rayonIndicateur * 2, rayonIndicateur * 2);
+
+                // Bordure
+                using var penBordure = new Pen(Color.FromArgb(180, couleur), 2.5f);
+                penBordure.DashStyle = styleBordure;
+                g.DrawEllipse(penBordure, x - rayonIndicateur, y - rayonIndicateur, rayonIndicateur * 2, rayonIndicateur * 2);
+
+                // Symbole au centre
+                float tailleS = rayonIndicateur * 0.5f;
+                using var penSymbole = new Pen(Color.FromArgb(200, Color.White), 2f);
+
+                if (utiliserEtoile)
+                {
+                    // Etoile (X + |)
+                    g.DrawLine(penSymbole, x - tailleS, y, x + tailleS, y);
+                    g.DrawLine(penSymbole, x, y - tailleS, x, y + tailleS);
+                    g.DrawLine(penSymbole, x - tailleS * 0.7f, y - tailleS * 0.7f, x + tailleS * 0.7f, y + tailleS * 0.7f);
+                    g.DrawLine(penSymbole, x + tailleS * 0.7f, y - tailleS * 0.7f, x - tailleS * 0.7f, y + tailleS * 0.7f);
+                }
+                else
+                {
+                    // Simple +
+                    g.DrawLine(penSymbole, x - tailleS, y, x + tailleS, y);
+                    g.DrawLine(penSymbole, x, y - tailleS, x, y + tailleS);
+                }
+            }
+        }
     }
 }

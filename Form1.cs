@@ -17,6 +17,16 @@ namespace jeu_de_point
 
         private EtatEcran etatEcran = EtatEcran.MenuPrincipal;
 
+        // Suggestions de points gagnants (Nombre de 4)
+        private List<(int Col, int Row)> pointsGagnants = [];
+        private bool afficherSuggestions;
+        private RectangleF rectBlocSuggestion;
+
+        // Suggestions de points 3 (Nombre de 3)
+        private List<(int Col, int Row)> pointsSuggestion3 = [];
+        private bool afficherSuggestions3;
+        private RectangleF rectBlocSuggestion3;
+
         public Form1()
         {
             InitializeComponent();
@@ -79,6 +89,15 @@ namespace jeu_de_point
         private void PasserAuJoueurSuivant()
         {
             indexJoueurCourant = (indexJoueurCourant + 1) % joueurs.Length;
+            MettreAJourSuggestions();
+        }
+
+        private void MettreAJourSuggestions()
+        {
+            pointsGagnants = grille.TrouverPointsGagnants(JoueurCourant);
+            pointsSuggestion3 = grille.TrouverPointsSuggestion3(JoueurCourant);
+            afficherSuggestions = false;
+            afficherSuggestions3 = false;
         }
 
         #region Navigation Ecrans
@@ -132,6 +151,7 @@ namespace jeu_de_point
 
             etatEcran = EtatEcran.Partie;
             menuUI.AfficherEcran(etatEcran);
+            MettreAJourSuggestions();
             Invalidate();
         }
 
@@ -155,6 +175,7 @@ namespace jeu_de_point
 
                 etatEcran = EtatEcran.Partie;
                 menuUI.AfficherEcran(etatEcran);
+                MettreAJourSuggestions();
                 Invalidate();
             }
             catch (Exception ex)
@@ -196,6 +217,22 @@ namespace jeu_de_point
         private void OnMouseClick(object? sender, MouseEventArgs e)
         {
             if (etatEcran != EtatEcran.Partie) return;
+
+            // Verifier si clic sur le bloc suggestion (Nombre de 4)
+            if (pointsGagnants.Count > 0 && rectBlocSuggestion.Contains(e.Location))
+            {
+                afficherSuggestions = !afficherSuggestions;
+                Invalidate();
+                return;
+            }
+
+            // Verifier si clic sur le bloc suggestion 3 (Nombre de 3)
+            if (pointsSuggestion3.Count > 0 && rectBlocSuggestion3.Contains(e.Location))
+            {
+                afficherSuggestions3 = !afficherSuggestions3;
+                Invalidate();
+                return;
+            }
 
             if (!grille.TryGetGeometrie(ClientSize, Theme.PaddingAutourGrille, out var geo)) return;
             if (!grille.TryGetIntersectionProche(e.Location, geo, out var intersection)) return;
@@ -361,6 +398,38 @@ namespace jeu_de_point
             dessinateur.DessinerAnimationTir(e.Graphics, animationTir, canons, geo);
             dessinateur.DessinerScores(e.Graphics, joueurs, geo, ForeColor);
             dessinateur.DessinerHUD(e.Graphics, JoueurCourant);
+
+            // Dessiner les indicateurs de suggestion (Nombre de 4) si actives
+            if (afficherSuggestions && pointsGagnants.Count > 0)
+            {
+                dessinateur.DessinerIndicateursSuggestion(e.Graphics, pointsGagnants, geo, JoueurCourant.Couleur);
+            }
+
+            // Dessiner les indicateurs de suggestion 3 (Nombre de 3) si actives
+            if (afficherSuggestions3 && pointsSuggestion3.Count > 0)
+            {
+                dessinateur.DessinerIndicateursSuggestion3(e.Graphics, pointsSuggestion3, geo, JoueurCourant.Couleur);
+            }
+
+            // Dessiner les blocs suggestion
+            float yBlocSuggestion = CalculerPositionYBlocSuggestion(e.Graphics);
+            rectBlocSuggestion = dessinateur.DessinerBlocSuggestion(e.Graphics, pointsGagnants.Count, afficherSuggestions, yBlocSuggestion);
+
+            // Dessiner le bloc Nombre de 3 en dessous
+            float yBlocSuggestion3 = yBlocSuggestion + rectBlocSuggestion.Height + Theme.HudEspacementBlocs;
+            rectBlocSuggestion3 = dessinateur.DessinerBlocSuggestion3(e.Graphics, pointsSuggestion3.Count, afficherSuggestions3, yBlocSuggestion3);
+        }
+
+        private float CalculerPositionYBlocSuggestion(Graphics g)
+        {
+            using var fontInfo = new Font(Font.FontFamily, Theme.HudTaillePolice, FontStyle.Bold);
+            float hauteurBloc = g.MeasureString("Ag", fontInfo).Height + (Theme.HudPaddingVertical * 2);
+
+            // Position apres: ETU + Tour + 2 instructions = 4 blocs
+            int nombreBlocs = 4;
+            float y = Theme.HudMargeHaut + (nombreBlocs * (hauteurBloc + Theme.HudEspacementBlocs)) + 10;
+
+            return y;
         }
 
         #endregion

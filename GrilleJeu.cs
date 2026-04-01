@@ -224,6 +224,156 @@ namespace jeu_de_point
             return false;
         }
 
+        /// <summary>
+        /// Trouve tous les points ou le joueur peut gagner en completant une ligne de 5.
+        /// Un point gagnant est un point vide qui, si place, complete un alignement de 5.
+        /// </summary>
+        public List<(int Col, int Row)> TrouverPointsGagnants(Joueur joueur)
+        {
+            var pointsGagnants = new List<(int Col, int Row)>();
+
+            // Parcourir toutes les positions vides de la grille
+            for (int col = 0; col < NombreLignes; col++)
+            {
+                for (int row = 0; row < NombreLignes; row++)
+                {
+                    if (PointsPoses.ContainsKey((col, row)))
+                    {
+                        continue; // Position deja occupee
+                    }
+
+                    // Verifier si placer un point ici complete un alignement de 5
+                    if (EstPointGagnant(col, row, joueur))
+                    {
+                        pointsGagnants.Add((col, row));
+                    }
+                }
+            }
+
+            return pointsGagnants;
+        }
+
+        private bool EstPointGagnant(int col, int row, Joueur joueur)
+        {
+            // Temporairement poser le point pour verifier
+            var position = (col, row);
+            PointsPoses[position] = joueur;
+
+            bool estGagnant = TryTrouverAlignementCinq(position, joueur, out _);
+
+            // Retirer le point temporaire
+            PointsPoses.Remove(position);
+
+            return estGagnant;
+        }
+
+        /// <summary>
+        /// Trouve les points ou le joueur peut creer un alignement de 4 avec les deux extremites libres.
+        /// Cela garantit une victoire car l'adversaire ne peut bloquer qu'un seul cote.
+        /// </summary>
+        public List<(int Col, int Row)> TrouverPointsSuggestion3(Joueur joueur)
+        {
+            var pointsSuggestion = new List<(int Col, int Row)>();
+
+            // Parcourir toutes les positions vides de la grille
+            for (int col = 0; col < NombreLignes; col++)
+            {
+                for (int row = 0; row < NombreLignes; row++)
+                {
+                    if (PointsPoses.ContainsKey((col, row)))
+                    {
+                        continue;
+                    }
+
+                    if (EstPointSuggestion3(col, row, joueur))
+                    {
+                        pointsSuggestion.Add((col, row));
+                    }
+                }
+            }
+
+            return pointsSuggestion;
+        }
+
+        private bool EstPointSuggestion3(int col, int row, Joueur joueur)
+        {
+            // Temporairement poser le point
+            var position = (col, row);
+            PointsPoses[position] = joueur;
+
+            bool resultat = CreerAlignement4AvecDeuxExtremitesLibres(position, joueur);
+
+            // Retirer le point temporaire
+            PointsPoses.Remove(position);
+
+            return resultat;
+        }
+
+        private bool CreerAlignement4AvecDeuxExtremitesLibres((int Col, int Row) pointJoue, Joueur joueur)
+        {
+            (int dCol, int dRow)[] directions =
+            [
+                (1, 0),   // Horizontal
+                (0, 1),   // Vertical
+                (1, 1),   // Diagonale descendante
+                (1, -1)   // Diagonale montante
+            ];
+
+            foreach (var (dCol, dRow) in directions)
+            {
+                // Compter les points consecutifs du joueur dans cette direction
+                var sequence = new List<(int Col, int Row)> { pointJoue };
+
+                // Direction negative
+                int c = pointJoue.Col - dCol;
+                int r = pointJoue.Row - dRow;
+                while (PointsPoses.TryGetValue((c, r), out var j) && ReferenceEquals(j, joueur))
+                {
+                    sequence.Insert(0, (c, r));
+                    c -= dCol;
+                    r -= dRow;
+                }
+
+                // Position de l'extremite negative (premiere case vide)
+                var extremiteNeg = (Col: c, Row: r);
+
+                // Direction positive
+                c = pointJoue.Col + dCol;
+                r = pointJoue.Row + dRow;
+                while (PointsPoses.TryGetValue((c, r), out var j) && ReferenceEquals(j, joueur))
+                {
+                    sequence.Add((c, r));
+                    c += dCol;
+                    r += dRow;
+                }
+
+                // Position de l'extremite positive (premiere case vide)
+                var extremitePos = (Col: c, Row: r);
+
+                // Verifier si on a exactement 4 points alignes
+                if (sequence.Count != 4)
+                {
+                    continue;
+                }
+
+                // Verifier que les deux extremites sont libres et dans la grille
+                bool extremiteNegLibre = EstDansGrille(extremiteNeg) && !PointsPoses.ContainsKey(extremiteNeg);
+                bool extremitePosLibre = EstDansGrille(extremitePos) && !PointsPoses.ContainsKey(extremitePos);
+
+                if (extremiteNegLibre && extremitePosLibre)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool EstDansGrille((int Col, int Row) pos)
+        {
+            return pos.Col >= 0 && pos.Col < NombreLignes && pos.Row >= 0 && pos.Row < NombreLignes;
+        }
+
         public bool TryGetGeometrie(Size clientSize, int padding, out GeometrieGrille geometrie)
         {
             geometrie = default;
